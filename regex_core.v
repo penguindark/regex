@@ -913,6 +913,8 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	//******************************************
 	// Post processing
 	//******************************************
+	
+	// add save_state flag to all token with more then 1 repetitions
 	pc = 0
 	for pc < re.prog_len {
 		if re.prog[pc].rep_max > 1 {

@@ -258,7 +258,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			rep        := state.rep[state.pc]
 			rep_min    := re.prog[state.pc].rep_min
 			rep_max    := re.prog[state.pc].rep_max
-			greedy     := re.prog[state.pc].greedy
+			// greedy     := re.prog[state.pc].greedy
 			save_state := re.prog[state.pc].save_state
 
 			if token_match == true {
@@ -277,8 +277,10 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					// we need to manage the state
 					// in order to keep track of the next tokens
 					if save_state == true {
+						
 						// we have not this level, create it
 						if states_index >= states_stack.len - 1 { 
+							// println("Create New state!")
 							states_stack << State {
 								i:state.i,
 								pc:state.pc,
@@ -288,8 +290,9 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 							}
 							states_index++
 						} 
-						// we can reuse soem memory, do it
+						// we can reuse some memory, do it
 						else {
+							// println("Reuse New state!")
 							states_index++
 
 							states_stack[states_index].i = state.i
@@ -302,7 +305,8 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 							states_stack[states_index].rep[c] = x
 						}
 
-						state.pc++
+						states_stack[states_index].pc++
+						// println("New state ready!")
 					}
 					continue
 				}
