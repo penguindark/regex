@@ -835,7 +835,17 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 			}
 		}
 
-		// IST_CHAR_CLASS_*
+		// ist_dot_char
+		if char_len == 1 && pc >= 0 && u8(char_tmp) == `.` {
+			re.prog[pc].ist = u32(0) | regex.ist_dot_char
+			re.prog[pc].rep_min = 1
+			re.prog[pc].rep_max = 1
+			pc = pc + 1
+			i = i + char_len
+			continue
+		}
+
+		// ist_char_class
 		if char_len == 1 && pc >= 0 {
 			if u8(char_tmp) == `[` {
 				cc_index, tmp, cc_type := re.parse_char_class(in_txt, i + 1)
