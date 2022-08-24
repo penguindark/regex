@@ -856,6 +856,34 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 			}
 		}
 
+		// ist_bsls_char
+		if char_len == 1 && pc >= 0 {
+			if u8(char_tmp) == `\\` {
+				bsls_index, tmp := re.parse_bsls(in_txt, i)
+				// println("index: $bsls_index str:${in_txt[i..i+tmp]}")
+				if bsls_index >= 0 {
+					i = i + tmp
+					re.prog[pc].ist = regex.ist_bsls_char
+					re.prog[pc].rep_min = 1
+					re.prog[pc].rep_max = 1
+					re.prog[pc].validator = regex.bsls_validator_array[bsls_index].validator
+					re.prog[pc].ch = regex.bsls_validator_array[bsls_index].ch
+					pc = pc + 1
+					continue
+				}
+				// this is an escape char, skip the bsls and continue as a normal char
+				else if bsls_index == regex.no_match_found {
+					i += char_len
+					char_tmp, char_len = re.get_char(in_txt, i)
+					// continue as simple char
+				}
+				// if not an escape or a bsls char then it is an error (at least for now!)
+				else {
+					return bsls_index, i + tmp
+				}
+			}
+		}
+
 		// ist_simple_char
 		re.prog[pc].ist = regex.ist_simple_char
 		re.prog[pc].ch = char_tmp

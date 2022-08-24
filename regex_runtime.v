@@ -135,6 +135,21 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				}
 			}
 
+			// bsls IST
+			else if ist == regex.ist_bsls_char {
+				if re.prog[state.pc].validator(u8(ch)) {
+					token_match = true
+					if state.match_start < 0 {
+						state.match_start = state.i
+					} else {
+						state.match_end = state.i + char_len
+					}
+
+					state.rep[state.pc]++ // increase repetitions
+					state.i += char_len // next char
+				}
+			}
+
 			/******************************
 			 * 
 			 *  Check quantifier
