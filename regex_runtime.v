@@ -158,12 +158,14 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			ch, char_len = re.get_charb(in_txt, state.i)
 
 			// check new line if flag f_nl enabled
-			/*
 			if (re.flag & regex.f_nl) != 0 && char_len == 1 && u8(ch) in regex.new_line_list {
-				fsm_state = .new_line
-				continue
-			}
-			*/
+				if states_index > 0 {
+					// println("this EOL branch is no godd,restore state!")
+					states_index--
+					continue
+				}
+				break
+			}			
 
 			token_match = false
 
@@ -290,7 +292,9 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 							states_stack[states_index].match_start = state.match_start
 						}
 
-						for c,x in state.rep {
+						// copy all the repetition
+						// mustbe optimized
+						for c,x in state.rep[..state.pc] {
 							states_stack[states_index].rep[c] = x
 						}
 
