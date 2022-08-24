@@ -127,15 +127,6 @@ pub fn (re RE) get_query() string {
 			res.write_string(')')
 		}
 
-		// OR branch
-		if ch == regex.ist_or_branch {
-			res.write_string('|')
-			if re.debug > 0 {
-				res.write_string('{$tk.rep_min,$tk.rep_max}')
-			}
-			i++
-			continue
-		}
 */
 		// char class
 		if ch == regex.ist_char_class_neg || ch == regex.ist_char_class_pos {

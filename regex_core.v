@@ -228,13 +228,16 @@ pub
 struct Token {
 mut:
 	ist u32
+	
 	// char
 	ch     rune // char of the token if any
 	ch_len u8   // char len
+	
 	// Quantifiers
 	rep_min int  // used also for jump next in the OR branch [no match] pc jump
 	rep_max int  // used also for jump next in the OR branch [   match] pc jump
 	greedy  bool // greedy quantifier flag
+	
 	// Char class
 	cc_index int = -1
 
