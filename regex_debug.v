@@ -66,6 +66,10 @@ pub fn (re RE) get_code() string {
 			}
 		}
 
+		if tk.save_state == true {
+			res.write_string(' SaveState')
+		}
+
 		res.write_string('\n')
 		if stop_flag {
 			break
@@ -176,6 +180,7 @@ pub fn (re RE) get_query() string {
 					res.write_string('?')
 				}
 			}
+
 		}
 		i++
 	}

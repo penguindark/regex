@@ -237,19 +237,16 @@ mut:
 	greedy  bool // greedy quantifier flag
 	// Char class
 	cc_index int = -1
-	// counters for quantifier check (repetitions)
-	rep int
+
+	// flag to enabel save state on this token if rep_max > 1
+	save_state bool
+
 	// validator function pointer
 	validator FnValidator
 	// groups variables
 	group_id  int = -1 // id of the group
 	// debug fields
 	source_index int
-}
-
-[inline]
-fn (mut tok Token) reset() {
-	tok.rep = 0
 }
 
 /******************************************************************************
@@ -475,7 +472,7 @@ fn (re RE) check_char_class(pc int, ch rune) bool {
 }
 
 // parse_char_class return (index, str_len, cc_type) of a char class [abcm-p], char class start after the [ char
-fn (mut re RE) parse_char_class(in_txt string, in_i int) (int, int, rune) {
+fn (mut re RE) parse_char_class(in_txt string, in_i int) (int, int, u32) {
 	mut status := CharClass_parse_state.start
 	mut i := in_i
 
@@ -838,6 +835,27 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 			}
 		}
 
+		// IST_CHAR_CLASS_*
+		if char_len == 1 && pc >= 0 {
+			if u8(char_tmp) == `[` {
+				cc_index, tmp, cc_type := re.parse_char_class(in_txt, i + 1)
+				if cc_index >= 0 {
+					// println("index: $cc_index str:${in_txt[i..i+tmp]}")
+					i = i + tmp
+					re.prog[pc].ist = u32(0) | cc_type
+					re.prog[pc].cc_index = cc_index
+					re.prog[pc].rep_min = 1
+					re.prog[pc].rep_max = 1
+					pc = pc + 1
+					continue
+				}
+				// cc_class vector memory full
+				else if cc_index < 0 {
+					return cc_index, i
+				}
+			}
+		}
+
 		// ist_simple_char
 		re.prog[pc].ist = regex.ist_simple_char
 		re.prog[pc].ch = char_tmp
@@ -853,6 +871,17 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	// add end of the program
 	re.prog[pc].ist = regex.ist_prog_end
 	re.prog_len = pc
+
+	//******************************************
+	// Post processing
+	//******************************************
+	pc = 0
+	for pc < re.prog_len {
+		if re.prog[pc].rep_max > 1 {
+			re.prog[pc].save_state = true
+		}
+		pc++
+	}
 
 	//******************************************
 	// DEBUG PRINT REGEX GENERATED CODE

@@ -31,11 +31,11 @@ enum Match_state {
 
 struct State {
 mut:
-	i   int = 0 
-	pc  int = 0
+	i   int
+	pc  int
 	match_start int = -1
 	match_end int = -1
-	rep []int
+	rep []int // counters for quantifier check (repetitions)
 }
 
 [direct_array_access]
@@ -67,6 +67,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 		for fsm_state != .end {
 
 			mut state := &states_stack[states_index]
+			println("states_index: ${states_index}")
 
 			// load the instruction
 			if state.pc >= 0 && state.pc < re.prog.len {
@@ -92,14 +93,41 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 			mut token_match := false
 
+			// char class IST
+			if ist == regex.ist_char_class_pos || ist == regex.ist_char_class_neg {
+				mut cc_neg := false
+				if ist == regex.ist_char_class_neg {
+					cc_neg = true
+				}
+				
+				mut cc_res := re.check_char_class(state.pc, ch)
+
+				if cc_neg {
+					cc_res = !cc_res
+				}
+
+				if cc_res == true {
+					token_match = true
+					if state.match_start < 0 {
+						state.match_start = state.i
+					} else {
+						state.match_end = state.i + char_len
+					}
+
+					state.rep[state.pc]++ // increase repetitions
+					state.i += char_len // next char
+				}
+				
+			}
+
 			// simple char IST
-			if ist == regex.ist_simple_char {
+			else if ist == regex.ist_simple_char {
 				if re.prog[state.pc].ch == ch {
 					token_match = true
 					if state.match_start < 0 {
 						state.match_start = state.i
 					} else {
-						state.match_end = state.i
+						state.match_end = state.i + char_len
 					}
 
 					state.rep[state.pc]++ // increase repetitions
@@ -112,18 +140,55 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			 *  Check quantifier
 			 * 
 			 ******************************/
-			rep := state.rep[state.pc]
-			rep_min := re.prog[state.pc].rep_min
-			rep_max := re.prog[state.pc].rep_max
-			greedy := re.prog[state.pc].greedy
+			rep        := state.rep[state.pc]
+			rep_min    := re.prog[state.pc].rep_min
+			rep_max    := re.prog[state.pc].rep_max
+			greedy     := re.prog[state.pc].greedy
+			save_state := re.prog[state.pc].save_state
+
 			if token_match == true {
 				// not enough token, continue
 				if rep < rep_min {
 					continue
 				}
-				// we are satsfied
+				// we are satisfied
 				if rep >= rep_min && rep < rep_max {
+					/*
 					if greedy == true {
+						state.pc++
+					}
+					*/
+					// we need to manage the state
+					// in order to keep track of the next tokens
+					if save_state == true {
+						// we have not this level, create it
+						if states_index >= states_stack.len - 1 { 
+							states_stack << State {
+								i:state.i,
+								pc:state.pc,
+								match_start:state.match_start,
+								match_end:state.match_end,
+								rep:[]int{len:re.prog_len, init:0}
+							}
+							states_index++
+							for c,x in state.rep {
+								states_stack[states_index].rep[c] = x
+							}
+
+						} 
+						// we can reuse soem memory, do it
+						else {
+							states_index++
+
+							states_stack[states_index].i = state.i
+							states_stack[states_index].pc = state.pc
+							states_stack[states_index].match_start = state.match_start
+							states_stack[states_index].match_start = state.match_start
+							for c,x in state.rep {
+								states_stack[states_index].rep[c] = x
+							}
+						}
+
 						state.pc++
 					}
 					continue
@@ -134,12 +199,21 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				}
 			} else {
 				// we have enough token, continue
-				if rep >= rep_min && rep < rep_max {
+				if rep >= rep_min && rep <= rep_max {
 					state.pc++
 					continue
 				}
 
 				// not a match
+
+				// we have to solve precedent situation
+				if states_index > 0 {
+					println("this branch is no godd,restore state!")
+					states_index--
+					continue
+				}
+
+				// no alternatives, break
 				break
 			}
 			
