@@ -916,12 +916,17 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	
 	// add save_state flag to all token with more then 1 repetitions
 	pc = 0
+	mut last_save_state_pc := -1
 	for pc < re.prog_len {
 		if re.prog[pc].rep_max > 1 {
 			re.prog[pc].save_state = true
+			last_save_state_pc =pc
 		}
 		pc++
 	}
+
+	// the last save_state must be false
+	re.prog[last_save_state_pc].save_state = false
 
 	//******************************************
 	// DEBUG PRINT REGEX GENERATED CODE

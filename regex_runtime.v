@@ -53,6 +53,8 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 	mut ist := u32(0) // actual instruction
 	states_stack[0].rep = []int{len:re.prog_len, init:0}
 
+	mut token_match := false
+
 	mut step_count := 0
 
 	if re.debug > 0 {
@@ -112,7 +114,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 							ch, char_len = re.get_charb(in_txt, state.i)
 
 							buf2.write_string('# ${step_count:3d} PC: ${state.pc:3d}=>')
-							buf2.write_string('${ist:8x}'.replace(' ', '0'))
+							// buf2.write_string('${ist:8x}'.replace(' ', '0'))
 							buf2.write_string(" i,ch,len:[${state.i:3d},'${utf8_str(ch)}',$char_len] f.m:[${state.match_start:3d},${state.match_end:3d}] ")
 
 							if ist == regex.ist_simple_char {
@@ -176,7 +178,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				continue
 			}
 
-			mut token_match := false
+			token_match = false
 
 			// char class IST
 			if ist == regex.ist_char_class_pos || ist == regex.ist_char_class_neg {
@@ -341,6 +343,13 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 	state := states_stack[states_index]
 	if ist == regex.ist_prog_end {
 		return state.match_start, state.match_end
+	}
+	if state.i > in_txt_len && 
+		re.prog[state.pc + 1 ].ist == regex.ist_prog_end &&
+		token_match == true
+	{
+			print("Here!")
+			return state.match_start, state.match_end - char_len
 	}
 	return -1, -1
 }
