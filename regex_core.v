@@ -227,7 +227,7 @@ pub type FnValidator = fn (u8) bool
 pub
 struct Token {
 mut:
-	ist rune
+	ist u32
 	// char
 	ch     rune // char of the token if any
 	ch_len u8   // char len
@@ -280,6 +280,8 @@ pub mut:
 	// char classes storage
 	cc       []CharClass // char class list
 	cc_index int // index
+
+	rep      [][]int
 
 	// flags
 	flag int // flag for optional parameters
