@@ -14,21 +14,6 @@ module regex
 
 import strings
 
-
-enum Match_state {
-	start = 0
-	stop
-	end
-	new_line
-	ist_load // load and execute instruction
-	ist_next // go to next instruction
-	ist_next_ks // go to next instruction without clenaning the state
-	ist_quant_p // match positive ,quantifier check
-	ist_quant_n // match negative, quantifier check
-	ist_quant_pg // match positive ,group quantifier check
-	ist_quant_ng // match negative ,group quantifier check
-}
-
 struct State {
 mut:
 	i   int
@@ -48,7 +33,6 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 	mut states_index := 0 // actual state index in states stack
 	mut states_stack := []State{len:1}  // states stack
-	mut fsm_state := Match_state.start // start point for the matcher FSM
 
 	mut ist := u32(0) // actual instruction
 	states_stack[0].rep = []int{len:re.prog_len, init:0}
@@ -68,11 +52,12 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 	}
 
 	unsafe{	
-		for fsm_state != .end {
+		for {
 
 			mut state := &states_stack[states_index]
 			// println("states_index: ${states_index} PC: ${state.pc} i: ${state.i} txt_len:${in_txt_len}")
 
+			// check out of text
 			if state.i > in_txt_len {
 				// println("Out of text!")
 				if states_index > 0 {
@@ -173,10 +158,12 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			ch, char_len = re.get_charb(in_txt, state.i)
 
 			// check new line if flag f_nl enabled
+			/*
 			if (re.flag & regex.f_nl) != 0 && char_len == 1 && u8(ch) in regex.new_line_list {
 				fsm_state = .new_line
 				continue
 			}
+			*/
 
 			token_match = false
 
@@ -307,19 +294,23 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 							states_stack[states_index].rep[c] = x
 						}
 
-						states_stack[states_index].pc++
+						tmp_pc := states_stack[states_index].pc + 1
+						states_stack[states_index].pc = tmp_pc
+						states_stack[states_index].rep[tmp_pc] = 0
 						// println("New state ready!")
 					}
 					continue
 				}
 				if rep == rep_max {
 					state.pc++
+					state.rep[state.pc] = 0
 					continue
 				}
 			} else {
 				// we have enough token, continue
 				if rep >= rep_min && rep <= rep_max {
 					state.pc++
+					state.rep[state.pc] = 0
 					continue
 				}
 

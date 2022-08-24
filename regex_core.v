@@ -926,8 +926,11 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	}
 
 	// the last save_state must be false
-	re.prog[last_save_state_pc].save_state = false
-
+	// if it is the last instruction before the end program token
+	if last_save_state_pc == re.prog_len - 1 {
+		re.prog[last_save_state_pc].save_state = false
+	}
+	
 	//******************************************
 	// DEBUG PRINT REGEX GENERATED CODE
 	//******************************************
