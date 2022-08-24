@@ -70,6 +70,10 @@ pub fn (re RE) get_code() string {
 			res.write_string(' SaveState')
 		}
 
+		if tk.or_flag == true {
+			res.write_string('\nOR')
+		}
+
 		res.write_string('\n')
 		if stop_flag {
 			break
@@ -181,6 +185,10 @@ pub fn (re RE) get_query() string {
 				}
 			}
 
+		}
+
+		if tk.or_flag {
+			res.write_string('|')
 		}
 		i++
 	}

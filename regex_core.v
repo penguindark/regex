@@ -238,6 +238,9 @@ mut:
 	// Char class
 	cc_index int = -1
 
+	// if true we have an OR ist as next
+	or_flag bool
+
 	// flag to enabel save state on this token if rep_max > 1
 	save_state bool
 
@@ -835,11 +838,23 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 			}
 		}
 
+		// OR branch
+		if char_len == 1 && pc > 0 && u8(char_tmp) == `|` {
+			char_next, char_next_len := re.get_char(in_txt, i + char_len)
+			if char_next_len == 1 && !(char_next in quntifier_chars) && char_next != `|` {
+				re.prog[pc - 1].or_flag = true
+				i = i + char_len
+				continue
+			}
+			return regex.err_syntax_error, i
+		}
+
 		// ist_dot_char
 		if char_len == 1 && pc >= 0 && u8(char_tmp) == `.` {
 			re.prog[pc].ist = u32(0) | regex.ist_dot_char
 			re.prog[pc].rep_min = 1
 			re.prog[pc].rep_max = 1
+			re.prog[pc].source_index = i
 			pc = pc + 1
 			i = i + char_len
 			continue
@@ -856,6 +871,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 					re.prog[pc].cc_index = cc_index
 					re.prog[pc].rep_min = 1
 					re.prog[pc].rep_max = 1
+					re.prog[pc].source_index = i
 					pc = pc + 1
 					continue
 				}
@@ -878,6 +894,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 					re.prog[pc].rep_max = 1
 					re.prog[pc].validator = regex.bsls_validator_array[bsls_index].validator
 					re.prog[pc].ch = regex.bsls_validator_array[bsls_index].ch
+					re.prog[pc].source_index = i
 					pc = pc + 1
 					continue
 				}
@@ -900,6 +917,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 		re.prog[pc].ch_len = u8(char_len)
 		re.prog[pc].rep_min = 1
 		re.prog[pc].rep_max = 1
+		re.prog[pc].source_index = i
 		// println("char: ${char_tmp:c}")
 		pc = pc + 1
 

@@ -293,12 +293,16 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 						}
 
 						// copy all the repetition
-						// mustbe optimized
+						// must be optimized
 						for c,x in state.rep[..state.pc] {
 							states_stack[states_index].rep[c] = x
 						}
 
 						tmp_pc := states_stack[states_index].pc + 1
+						if re.prog[state.pc].or_flag == true {
+							tmp_pc++
+						}
+						
 						states_stack[states_index].pc = tmp_pc
 						states_stack[states_index].rep[tmp_pc] = 0
 						// println("New state ready!")
@@ -306,6 +310,9 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					continue
 				}
 				if rep == rep_max {
+					if re.prog[state.pc].or_flag == true {
+						state.pc++
+					}
 					state.pc++
 					state.rep[state.pc] = 0
 					continue
@@ -313,6 +320,9 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			} else {
 				// we have enough token, continue
 				if rep >= rep_min && rep <= rep_max {
+					if re.prog[state.pc].or_flag == true {
+						state.pc++
+					}
 					state.pc++
 					state.rep[state.pc] = 0
 					continue
@@ -324,6 +334,13 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				if states_index > 0 {
 					// println("this branch is no good,restore state!")
 					states_index--
+					continue
+				}
+
+				// we have an OR try it
+				if re.prog[state.pc].or_flag == true {
+					state.pc++
+					state.rep[state.pc] = 0
 					continue
 				}
 
