@@ -689,7 +689,8 @@ fn (re RE) parse_groups(in_txt string, in_i int) (int, bool, bool, string, int) 
 * Regex Compiler
 *
 ******************************************************************************/
-// compile return (return code, index) where index is the index of the error in the query string if return code is an error code
+// compile return (return code, index) where index is the index of the error in the query string 
+// if return code is an error code
 fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	mut i  := 0 // input string index
 	mut pc := 0 // program counter
@@ -698,12 +699,13 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 
 	// groups
 	mut group_count       := 0
-	mut group_stack_index := 0
-	mut group_stack       := []int{len:1}
+	mut group_index       := 0
+	mut group_stack       := []int
 
 	re.groups << Group{
 		id : 0,
 	}
+	group_stack << 0
 
 	i = 0
 	for i < in_txt.len {
@@ -731,7 +733,6 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 		// Group start
 		//
 		if char_len == 1 && pc >= 0 && u8(char_tmp) == `(` {
-			group_stack_index++
 			tmp_res, cgroup_flag, negate_flag, cgroup_name, next_i := re.parse_groups(in_txt, i)
 
 			// manage question mark format error
@@ -741,18 +742,23 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 
 			// println("Parse group: [$tmp_res, $cgroup_flag, ($i,$next_i), '${in_txt[i..next_i]}' ]")
 
+			group_index++
 			if cgroup_flag == true {
 				group_count++
 			}
-
-			group_stack << pc
+			group_stack << group_count
 
 			re.prog[pc].ist = regex.ist_group_start
 			re.prog[pc].rep_min = 0
 			re.prog[pc].rep_max = 1
 			re.prog[pc].source_index = i
 			re.prog[pc].group_id = group_count
-			re.groups << Group{id:group_count}
+			//re.prog[pc].save_state = true
+			re.groups << Group{
+				id:group_count,
+				pc_start:pc,
+				source_is:i
+			}
 			
 			pc = pc + 1
 			i = next_i
@@ -763,24 +769,26 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 		// Group end
 		//
 		if char_len == 1 && pc > 0 && u8(char_tmp) == `)` {
-			if group_stack_index < 0 {
-				return regex.err_group_not_balanced, i + 1
+			if group_index <= 0 {
+				return regex.err_group_not_balanced, i
 			}
+
+			group_id := group_stack[group_index]
 			
 			re.prog[pc].ist = regex.ist_group_end
 			re.prog[pc].rep_min = 1
 			re.prog[pc].rep_max = 1
 			re.prog[pc].source_index = i
-			re.prog[pc].group_id = group_count
+			re.prog[pc].group_id = group_id
 			
-			start_pc := group_stack[group_stack_index]
-			re.prog[pc].group_start_pc = start_pc
-			re.prog[start_pc].group_end_pc = pc
+			re.prog[pc].group_start_pc = re.groups[group_id].pc_start
+			re.prog[pc].group_end_pc = pc
 
-			re.groups[group_count].pc_start = start_pc
-			re.groups[group_count].pc_end = pc
+			re.groups[group_id].pc_end = pc
+			re.groups[group_id].source_ie = i
 
-			group_stack_index--
+			//group_count--
+			group_index--
 			pc = pc + 1
 			i = i + char_len
 			continue
@@ -886,6 +894,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 			re.prog[pc].rep_min = 1
 			re.prog[pc].rep_max = 1
 			re.prog[pc].source_index = i
+			re.prog[pc].group_id = group_count
 			pc = pc + 1
 			i = i + char_len
 			continue
@@ -905,6 +914,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 					re.prog[pc].rep_min = 1
 					re.prog[pc].rep_max = 1
 					re.prog[pc].source_index = i
+					re.prog[pc].group_id = group_count
 					pc = pc + 1
 					continue
 				}
@@ -930,6 +940,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 					re.prog[pc].validator = regex.bsls_validator_array[bsls_index].validator
 					re.prog[pc].ch = regex.bsls_validator_array[bsls_index].ch
 					re.prog[pc].source_index = i
+					re.prog[pc].group_id = group_count
 					pc = pc + 1
 					continue
 				}
@@ -955,6 +966,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 		re.prog[pc].rep_min = 1
 		re.prog[pc].rep_max = 1
 		re.prog[pc].source_index = i
+		re.prog[pc].group_id = group_count
 		// println("char: ${char_tmp:c}")
 		pc = pc + 1
 
@@ -965,6 +977,13 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	re.prog[pc].ist = regex.ist_prog_end
 	re.prog_len = pc
 
+	// manage error for group not closed
+	if group_index > 0 {
+		// println("group_count: ${group_count}")
+		src_i := re.groups[re.groups.len - group_index - 2].source_is
+		return regex.err_group_not_balanced, src_i
+	}
+
 	//******************************************
 	// Post processing
 	//******************************************
@@ -973,7 +992,11 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	pc = 0
 	mut last_save_state_pc := -1
 	for pc < re.prog_len {
-		if re.prog[pc].rep_max > 1 {
+		// ifthe next token is a token that doesn't require save state
+		// avoid to save the state
+		if re.prog[pc].rep_max > 1 &&
+			!(re.prog[pc + 1].ist in [regex.ist_group_end, regex.ist_prog_end, regex.ist_simple_char])
+		{
 			re.prog[pc].save_state = true
 			last_save_state_pc =pc
 		}
@@ -982,7 +1005,10 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 
 	// the last save_state must be false
 	// if it is the last instruction before the end program token
-	if last_save_state_pc == re.prog_len - 1 {
+
+	if last_save_state_pc == re.prog_len - 1 && 
+		re.prog[last_save_state_pc].ist != regex.ist_group_end
+	{
 		re.prog[last_save_state_pc].save_state = false
 	}
 	
