@@ -32,7 +32,7 @@ pub const (
 	no_match_found           = -1
 
 	// Errors
-	compile_ok               = 0 // the regex string compiled, all ok
+	compile_ok               =  0 // the regex string compiled, all ok
 	err_char_unknown         = -2 // the char used is unknow to the system
 	err_undefined            = -3 // the compiler symbol is undefined
 	err_internal_error       = -4 // Bug in the regex system!!
@@ -849,7 +849,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 				i = i + char_len
 				continue
 			}
-			return regex.err_syntax_error, i
+			return regex.err_syntax_error, i + char_next_len
 		}
 
 		// ist_dot_char
