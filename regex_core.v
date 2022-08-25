@@ -699,6 +699,11 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	// groups
 	mut group_count       := 0
 	mut group_stack_index := 0
+	mut group_stack       := []int{len:1}
+
+	re.groups << Group{
+		id : 0,
+	}
 
 	i = 0
 	for i < in_txt.len {
@@ -740,13 +745,15 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 				group_count++
 			}
 
+			group_stack << pc
+
 			re.prog[pc].ist = regex.ist_group_start
-			re.prog[pc].rep_min = 1
+			re.prog[pc].rep_min = 0
 			re.prog[pc].rep_max = 1
 			re.prog[pc].source_index = i
 			re.prog[pc].group_id = group_count
-			re.prog[pc].save_state = true
-
+			re.groups << Group{id:group_count}
+			
 			pc = pc + 1
 			i = next_i
 			continue
@@ -759,14 +766,21 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 			if group_stack_index < 0 {
 				return regex.err_group_not_balanced, i + 1
 			}
-			group_stack_index--
-
+			
 			re.prog[pc].ist = regex.ist_group_end
 			re.prog[pc].rep_min = 1
 			re.prog[pc].rep_max = 1
 			re.prog[pc].source_index = i
 			re.prog[pc].group_id = group_count
+			
+			start_pc := group_stack[group_stack_index]
+			re.prog[pc].group_start_pc = start_pc
+			re.prog[start_pc].group_end_pc = pc
 
+			re.groups[group_count].pc_start = start_pc
+			re.groups[group_count].pc_end = pc
+
+			group_stack_index--
 			pc = pc + 1
 			i = i + char_len
 			continue

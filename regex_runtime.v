@@ -38,10 +38,6 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 	mut ist := u32(0) // actual instruction
 	states_stack[0].rep = []int{len:re.prog_len, init:0}
 
-	re.groups << Group{
-		id : 0,
-	}
-
 	mut token_match := false
 
 	mut step_count := 0
@@ -170,10 +166,36 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				break
 			}			
 
-			token_match = false
+
+			// group start IST
+			if ist == regex.ist_group_start {
+				println("regex.ist_group_start ")
+				state.group_index++
+				re.groups[state.group_index].i_start = state.i
+
+				state.pc++
+				state.rep[state.pc] = 0
+				continue
+				
+			}
+
+			// group end IST
+			else if ist == regex.ist_group_end {
+				if token_match == true {
+					state.rep[state.pc]++
+					re.groups[state.group_index].i_end = state.i
+					state.group_index--
+
+					if state.rep[state.pc] < re.prog[state.pc].rep_max {
+						state.pc = re.prog[state.pc].group_start_pc
+						continue
+					}
+				}
+			}
 
 			// char class IST
-			if ist == regex.ist_char_class_pos || ist == regex.ist_char_class_neg {
+			else if ist == regex.ist_char_class_pos || ist == regex.ist_char_class_neg {
+				token_match = false
 				mut cc_neg := false
 				if ist == regex.ist_char_class_neg {
 					cc_neg = true
@@ -214,6 +236,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 			// bsls IST
 			else if ist == regex.ist_bsls_char {
+				token_match = false
 				if re.prog[state.pc].validator(u8(ch)) {
 					token_match = true
 					if state.match_start < 0 {
@@ -229,6 +252,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 			// simple char IST
 			else if ist == regex.ist_simple_char {
+				token_match = false
 				if re.prog[state.pc].ch == ch {
 					token_match = true
 					if state.match_start < 0 {
@@ -251,6 +275,90 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			greedy     := re.prog[state.pc].greedy
 			save_state := re.prog[state.pc].save_state
 
+			//
+			// Quntifier for end group token
+			// 
+			if ist == regex.ist_group_end {
+				// we have a fail in a group
+				if token_match == false {
+					if rep >= rep_min && rep <= rep_max {
+						if re.prog[state.pc].or_flag == true {
+							state.pc++
+						}
+						state.pc++
+						state.rep[state.pc] = 0
+						continue
+					}
+				}
+				
+				group_start_pc := re.prog[state.pc].group_start_pc
+				
+				if rep < rep_min {
+					state.pc = group_start_pc
+					continue
+				}
+
+				// we are in game, try the next ists
+				if rep >= rep_min && rep < rep_max {
+					
+					// println("Save state!")
+					// we have not this level, create it
+					if states_index >= states_stack.len - 1 { 
+						// println("Create New state!")
+						states_stack << State {
+							i:state.i,
+							pc:state.pc + 1,
+							match_start:state.match_start,
+							match_end:state.match_end,
+							rep:[]int{len:re.prog_len, init:0}
+							group_index: state.group_index
+						}
+						states_index++
+					} 
+					// we can reuse some memory, do it
+					else {
+						// println("Reuse New state!")
+						states_index++
+
+						states_stack[states_index].i = state.i
+						states_stack[states_index].pc = state.pc + 1
+						states_stack[states_index].match_start = state.match_start
+						states_stack[states_index].match_start = state.match_start
+						states_stack[states_index].group_index = state.group_index
+					}
+
+					states_stack[states_index].rep = state.rep.clone()
+
+					tmp_pc := states_stack[states_index].pc + 1
+					if re.prog[state.pc].or_flag == true {
+						tmp_pc++
+					}
+					
+					states_stack[states_index].pc = tmp_pc
+					states_stack[states_index].rep[tmp_pc] = 0
+					// println("New state ready!")
+					
+					continue
+				}
+
+				if rep == rep_max {
+					if re.prog[state.pc].or_flag == true {
+						state.pc++
+					}
+					state.pc++
+					state.rep[state.pc] = 0
+					continue
+				}
+
+
+			}
+
+
+			//
+			// Quntifier for tokens
+			// 
+
+			// println("token_match ${token_match} IST:${ist:x}")
 			if token_match == true {
 				// not enough token, continue
 				if rep < rep_min {
@@ -271,7 +379,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					// we need to manage the state
 					// in order to keep track of the next tokens
 					if save_state == true {
-						
+						// println("Save state!")
 						// we have not this level, create it
 						if states_index >= states_stack.len - 1 { 
 							// println("Create New state!")
@@ -281,6 +389,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 								match_start:state.match_start,
 								match_end:state.match_end,
 								rep:[]int{len:re.prog_len, init:0}
+								group_index: state.group_index
 							}
 							states_index++
 						} 
@@ -293,6 +402,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 							states_stack[states_index].pc = state.pc
 							states_stack[states_index].match_start = state.match_start
 							states_stack[states_index].match_start = state.match_start
+							states_stack[states_index].group_index = state.group_index
 						}
 
 						// copy all the repetition
@@ -352,6 +462,11 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					continue
 				}
 
+				if state.group_index > 0 {
+					// println("We are in group failed match! group_index:${state.group_index} states_index:${states_index}")
+					state.pc = re.groups[state.group_index].pc_end
+					continue
+				}
 				// no alternatives, break
 				break
 			}

@@ -123,6 +123,9 @@ mut:
 	validator FnValidator
 	// groups variables
 	group_id  int = -1 // id of the group
+	group_start_pc int
+	group_end_pc int
+
 	// debug fields
 	source_index int
 }
@@ -133,10 +136,13 @@ mut:
 *
 ******************************************************************************/
 struct Group {
+mut:
 	id int
 	name string
 	pc_start int = -1
 	pc_end   int = -1
+	i_start  int = -1
+	i_end    int = -1
 }
 
 /******************************************************************************
