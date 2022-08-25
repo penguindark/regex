@@ -12,6 +12,7 @@ pub fn (re RE) get_code() string {
 
 	for pc1 <= re.prog.len {
 		tk := re.prog[pc1]
+		
 		res.write_string('PC:${pc1:3d}')
 
 		res.write_string(' ist: ')
@@ -32,10 +33,10 @@ pub fn (re RE) get_code() string {
 		} else if ist == regex.ist_dot_char {
 			res.write_string('.        DOT_CHAR')
 		} 
-/*
+
 		else if ist == regex.ist_group_start {
 			res.write_string('(        GROUP_START #:$tk.group_id')
-			if tk.group_id == -1 {
+/*			if tk.group_id == -1 {
 				res.write_string(' ?:')
 			} else {
 				for x in re.group_map.keys() {
@@ -45,10 +46,11 @@ pub fn (re RE) get_code() string {
 					}
 				}
 			}
+*/
 		} else if ist == regex.ist_group_end {
 			res.write_string(')        GROUP_END   #:$tk.group_id')
 		} 
-*/
+
 		else if ist == regex.ist_simple_char {
 			res.write_string('[${tk.ch:1c}]      query_ch')
 		}
@@ -97,14 +99,14 @@ pub fn (re RE) get_query() string {
 	for i < re.prog.len && re.prog[i].ist != regex.ist_prog_end && re.prog[i].ist != 0 {
 		tk := unsafe { &re.prog[i] }
 		ch := tk.ist
-/*
+
 		// GROUP start
 		if ch == regex.ist_group_start {
 			if re.debug > 0 {
 				res.write_string('#$tk.group_id')
 			}
 			res.write_string('(')
-
+/*
 			if tk.group_neg == true {
 				res.write_string('?!') // negation group
 			} else if tk.group_id == -1 {
@@ -117,7 +119,7 @@ pub fn (re RE) get_query() string {
 					break
 				}
 			}
-
+*/
 			i++
 			continue
 		}
@@ -127,7 +129,7 @@ pub fn (re RE) get_query() string {
 			res.write_string(')')
 		}
 
-*/
+
 		// char class
 		if ch == regex.ist_char_class_neg || ch == regex.ist_char_class_pos {
 			res.write_string('[')

@@ -19,7 +19,8 @@ mut:
 	i   int
 	pc  int
 	match_start int = -1
-	match_end int = -1
+	match_end   int = -1
+	group_index int = 0
 	rep []int // counters for quantifier check (repetitions)
 }
 
@@ -36,6 +37,10 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 	mut ist := u32(0) // actual instruction
 	states_stack[0].rep = []int{len:re.prog_len, init:0}
+
+	re.groups << Group{
+		id : 0,
+	}
 
 	mut token_match := false
 
@@ -117,14 +122,15 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 								} else if ist == regex.ist_dot_char {
 									buf2.write_string('DOT_CHAR')
 								} 
-								/* else if ist == regex.ist_group_start {
+								else if ist == regex.ist_group_start {
 									tmp_gi := re.prog[state.pc].group_id
-									tmp_gr := re.prog[re.prog[state.pc].goto_pc].group_rep
-									buf2.write_string('GROUP_START #:$tmp_gi rep:$tmp_gr ')
+									//tmp_gr := re.prog[re.prog[state.pc].goto_pc].group_rep
+									//buf2.write_string('GROUP_START #:$tmp_gi rep:$tmp_gr ')
+									buf2.write_string('GROUP_START #:$tmp_gi')
 								} else if ist == regex.ist_group_end {
 									buf2.write_string('GROUP_END   #:${re.prog[state.pc].group_id} deep:$state.group_index')
 								}
-								*/
+								
 							}
 							if re.prog[state.pc].rep_max == regex.max_quantifier {
 								buf2.write_string('{${re.prog[state.pc].rep_min},MAX}:${state.rep[state.pc]}')

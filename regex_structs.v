@@ -129,6 +129,18 @@ mut:
 
 /******************************************************************************
 *
+* Groups
+*
+******************************************************************************/
+struct Group {
+	id int
+	name string
+	pc_start int = -1
+	pc_end   int = -1
+}
+
+/******************************************************************************
+*
 * Regex struct
 *
 ******************************************************************************/
@@ -156,7 +168,11 @@ pub mut:
 	cc       []CharClass // char class list
 	cc_index int // index
 
+	// repetitions data array
 	rep      [][]int
+
+	// groups
+	groups []Group
 
 	// flags
 	flag int // flag for optional parameters

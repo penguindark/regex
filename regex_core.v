@@ -581,6 +581,111 @@ fn (re RE) parse_quantifier(in_txt string, in_i int) (int, int, int, bool) {
 
 /******************************************************************************
 *
+* Groups
+*
+******************************************************************************/
+enum Group_parse_state {
+	start
+	q_mark // (?
+	q_mark1 // (?:|P  checking
+	p_status // (?P
+	p_start // (?P<
+	p_end // (?P<...>
+	p_in_name // (?P<...
+	finish
+}
+
+// parse_groups parse a group for ? (question mark) syntax, if found, return (error, capture_flag, negate_flag, name_of_the_group, next_index)
+fn (re RE) parse_groups(in_txt string, in_i int) (int, bool, bool, string, int) {
+	mut status := Group_parse_state.start
+	mut i      := in_i
+	mut name   := ''
+
+	for i < in_txt.len && status != .finish {
+		// get our char
+		char_tmp, char_len := re.get_char(in_txt, i)
+		ch := u8(char_tmp)
+
+		// start
+		if status == .start && ch == `(` {
+			status = .q_mark
+			i += char_len
+			continue
+		}
+
+		// check for question marks
+		if status == .q_mark && ch == `?` {
+			status = .q_mark1
+			i += char_len
+			continue
+		}
+
+		// negate group
+		if status == .q_mark1 && ch == `!` {
+			i += char_len
+			return 0, false, true, name, i
+		}
+
+		// non capturing group
+		if status == .q_mark1 && ch == `:` {
+			i += char_len
+			return 0, false, false, name, i
+		}
+
+		// enter in P section
+		if status == .q_mark1 && ch == `P` {
+			status = .p_status
+			i += char_len
+			continue
+		}
+
+		// not a valid q mark found
+		if status == .q_mark1 {
+			// println("NO VALID Q MARK")
+			return -2, true, false, name, i
+		}
+
+		if status == .p_status && ch == `<` {
+			status = .p_start
+			i += char_len
+			continue
+		}
+
+		if status == .p_start && ch != `>` {
+			status = .p_in_name
+			name += '${ch:1c}' // TODO: manage utf8 chars
+			i += char_len
+			continue
+		}
+
+		// colect name
+		if status == .p_in_name && ch != `>` && is_alnum(ch) {
+			name += '${ch:1c}' // TODO: manage utf8 chars
+			i += char_len
+			continue
+		}
+
+		// end name
+		if status == .p_in_name && ch == `>` {
+			i += char_len
+			return 0, true, false, name, i
+		}
+
+		// error on name group
+		if status == .p_in_name {
+			return -2, true, false, name, i
+		}
+
+		// normal group, nothig to do, exit
+		return 0, true, false, name, i
+	}
+	// UNREACHABLE
+	// println("ERROR!! NOT MEANT TO BE HERE!!1")
+	return -2, true, false, name, i
+}
+
+/******************************************************************************
+*
 * Regex Compiler
 *
 ******************************************************************************/
@@ -590,6 +695,10 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	mut pc := 0 // program counter
 
 	re.query = in_txt // save the query string
+
+	// groups
+	mut group_count       := 0
+	mut group_stack_index := 0
 
 	i = 0
 	for i < in_txt.len {
@@ -609,6 +718,56 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 		}
 		if i == (in_txt.len - 1) && char_len == 1 && u8(char_tmp) == `$` {
 			re.flag = regex.f_me
+			i = i + char_len
+			continue
+		}
+
+		//
+		// Group start
+		//
+		if char_len == 1 && pc >= 0 && u8(char_tmp) == `(` {
+			group_stack_index++
+			tmp_res, cgroup_flag, negate_flag, cgroup_name, next_i := re.parse_groups(in_txt, i)
+
+			// manage question mark format error
+			if tmp_res < -1 {
+				return regex.err_group_qm_notation, next_i
+			}
+
+			// println("Parse group: [$tmp_res, $cgroup_flag, ($i,$next_i), '${in_txt[i..next_i]}' ]")
+
+			if cgroup_flag == true {
+				group_count++
+			}
+
+			re.prog[pc].ist = regex.ist_group_start
+			re.prog[pc].rep_min = 1
+			re.prog[pc].rep_max = 1
+			re.prog[pc].source_index = i
+			re.prog[pc].group_id = group_count
+			re.prog[pc].save_state = true
+
+			pc = pc + 1
+			i = next_i
+			continue
+		}
+
+		//
+		// Group end
+		//
+		if char_len == 1 && pc > 0 && u8(char_tmp) == `)` {
+			if group_stack_index < 0 {
+				return regex.err_group_not_balanced, i + 1
+			}
+			group_stack_index--
+
+			re.prog[pc].ist = regex.ist_group_end
+			re.prog[pc].rep_min = 1
+			re.prog[pc].rep_max = 1
+			re.prog[pc].source_index = i
+			re.prog[pc].group_id = group_count
+
+			pc = pc + 1
 			i = i + char_len
 			continue
 		}
