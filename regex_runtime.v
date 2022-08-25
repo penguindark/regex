@@ -97,8 +97,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 						
 						} else {
 							ch, char_len = re.get_charb(in_txt, state.i)
-
-							buf2.write_string('# ${step_count:3d} PC: ${state.pc:3d}=>')
+							buf2.write_string('# ${step_count:3d} TL:${in_txt_len:3d} SI:${states_index:2d} PC: ${state.pc:3d}=>')
 							// buf2.write_string('${ist:8x}'.replace(' ', '0'))
 							buf2.write_string(" i,ch,len:[${state.i:3d},'${utf8_str(ch)}',$char_len] f.m:[${state.match_start:3d},${state.match_end:3d}] ")
 
@@ -136,8 +135,6 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 								buf2.write_string('?')
 							}
 							//buf2.write_string(' (#$state.group_index)')
-
-							buf2.write_string(' states_index: ${states_index} txt_len:${in_txt_len}')
 
 							buf2.write_string('\n')
 						}
@@ -294,9 +291,14 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 						// copy all the repetition
 						// must be optimized
+						/*
 						for c,x in state.rep[..state.pc] {
 							states_stack[states_index].rep[c] = x
 						}
+						*/
+
+						states_stack[states_index].rep = state.rep.clone()
+
 
 						tmp_pc := states_stack[states_index].pc + 1
 						if re.prog[state.pc].or_flag == true {
