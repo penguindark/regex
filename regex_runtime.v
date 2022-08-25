@@ -236,17 +236,13 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				}
 			}
 
-
-
-			/******************************
-			 * 
-			 *  Check quantifier
-			 * 
-			 ******************************/
+			//******************************************
+			// Check quantifier
+			//******************************************
 			rep        := state.rep[state.pc]
 			rep_min    := re.prog[state.pc].rep_min
 			rep_max    := re.prog[state.pc].rep_max
-			// greedy     := re.prog[state.pc].greedy
+			greedy     := re.prog[state.pc].greedy
 			save_state := re.prog[state.pc].save_state
 
 			if token_match == true {
@@ -256,11 +252,15 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				}
 				// we are satisfied
 				if rep >= rep_min && rep < rep_max {
-					/*
+/*					
+					// greedy flag management
 					if greedy == true {
+						if re.prog[state.pc].or_flag == true {
+							state.pc++
+						}
 						state.pc++
 					}
-					*/
+*/					
 					
 					// we need to manage the state
 					// in order to keep track of the next tokens
