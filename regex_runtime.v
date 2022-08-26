@@ -63,15 +63,17 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 			out_of_text = false
 			// check out of text
-			if state.i >= in_txt_len {
+			if state.i > in_txt_len {
 				println("out_of_text!")
 				// we are out of text
 				out_of_text = state.i >= in_txt_len
 				token_match = false
 
 				// println("state.pc: ${state.pc} re.prog.len: ${re.prog_len}")
+				
 				// we can exit here, this is the last ist
 				if state.pc == re.prog_len - 1 {
+					// println("BREAK!")
 					break
 				}
 
@@ -80,7 +82,6 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					states_index--
 					continue
 				}
-
 
 				break
 			}
@@ -504,6 +505,9 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 		// println("tmp_pc: ${tmp_pc} rep: ${rep}")
 		if rep > re.prog[tmp_pc].rep_min {
 			// return state.match_start, state.match_end - char_len
+			re.groups[0].i_start = state.match_start
+			re.groups[0].i_end = state.match_end
+
 			return state.match_start, state.match_end
 		}
 	}
