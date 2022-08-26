@@ -34,11 +34,11 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 	mut states_index := 0 // actual state index in states stack
 	mut states_stack := []State{len:1}  // states stack
+	states_stack[0].rep = []int{len:re.prog_len, init:0} // create the first state
 
 	mut ist := u32(0) // actual instruction
 	mut group_id := 0
-	states_stack[0].rep = []int{len:re.prog_len, init:0}
-
+	
 	mut token_match := false
 	mut out_of_text := false
 
@@ -54,23 +54,35 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 		re.log_func(sss)
 	}
 
+	
+
 	unsafe{	
 		for {
-
 			mut state := &states_stack[states_index]
 			// println("states_index: ${states_index} PC: ${state.pc} i: ${state.i} txt_len:${in_txt_len}")
 
+			out_of_text = false
 			// check out of text
 			if state.i >= in_txt_len {
+				println("out_of_text!")
 				// we are out of text
 				out_of_text = state.i >= in_txt_len
 				token_match = false
 
+				// println("state.pc: ${state.pc} re.prog.len: ${re.prog_len}")
+				// we can exit here, this is the last ist
+				if state.pc == re.prog_len - 1 {
+					break
+				}
+
 				if states_index > 0 {
-					//vprintln("this Out of text branch is no godd,restore state!")
+					// println("this Out of text branch is no godd,restore state!")
 					states_index--
 					continue
 				}
+
+
+				break
 			}
 
 			// load the instruction
@@ -162,7 +174,8 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				break
 			}
 
-			if !out_of_text {
+			//if !out_of_text {
+			if true {
 				// load the char
 				ch, char_len = re.get_charb(in_txt, state.i)
 
@@ -345,6 +358,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				if rep < rep_min {
 					continue
 				}
+
 				// we are satisfied
 				if rep >= rep_min && rep < rep_max {			
 					// we need to manage the state
@@ -479,7 +493,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 		re.prog[state.pc + 1 ].ist == regex.ist_prog_end &&
 		token_match == true
 	{
-			print("Here!")
+			//print("Here!")
 			return state.match_start, state.match_end - char_len
 	}
 
@@ -487,9 +501,10 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 	if re.prog[state.pc].ist != regex.ist_prog_end {
 		tmp_pc := re.prog_len - 1
 		rep := state.rep[tmp_pc]
-		//println("tmp_pc: ${tmp_pc} rep: ${rep}")
+		// println("tmp_pc: ${tmp_pc} rep: ${rep}")
 		if rep > re.prog[tmp_pc].rep_min {
-			return state.match_start, state.match_end - char_len
+			// return state.match_start, state.match_end - char_len
+			return state.match_start, state.match_end
 		}
 	}
 
