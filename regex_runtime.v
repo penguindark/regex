@@ -36,9 +36,11 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 	mut states_stack := []State{len:1}  // states stack
 
 	mut ist := u32(0) // actual instruction
+	mut group_id := 0
 	states_stack[0].rep = []int{len:re.prog_len, init:0}
 
 	mut token_match := false
+	mut out_of_text := false
 
 	mut step_count := 0
 
@@ -59,19 +61,22 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			// println("states_index: ${states_index} PC: ${state.pc} i: ${state.i} txt_len:${in_txt_len}")
 
 			// check out of text
-			if state.i > in_txt_len {
-				// println("Out of text!")
+			if state.i >= in_txt_len {
+				// we are out of text
+				out_of_text = state.i >= in_txt_len
+				token_match = false
+
 				if states_index > 0 {
-					// println("this Out of text branch is no godd,restore state!")
+					//vprintln("this Out of text branch is no godd,restore state!")
 					states_index--
 					continue
 				}
-				break
 			}
 
 			// load the instruction
 			if state.pc >= 0 && state.pc < re.prog.len {
 				ist = re.prog[state.pc].ist
+				group_id = re.prog[state.pc].group_id
 			} else if state.pc >= re.prog.len {
 				// eprintln("ERROR!! PC overflow!!")
 				return regex.err_internal_error, state.i
@@ -86,7 +91,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				// print all the instructions
 
 				// end of the input text
-				if state.i >= in_txt_len {
+				if out_of_text {
 					buf2.write_string('# ${step_count:3d} END OF INPUT TEXT\n')
 					sss := buf2.str()
 					re.log_func(sss)
@@ -122,79 +127,106 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 									tmp_gi := re.prog[state.pc].group_id
 									//tmp_gr := re.prog[re.prog[state.pc].goto_pc].group_rep
 									//buf2.write_string('GROUP_START #:$tmp_gi rep:$tmp_gr ')
-									buf2.write_string('GROUP_START #:$tmp_gi')
+									buf2.write_string('GROUP_START #:$tmp_gi REP:${state.rep[state.pc]} ')
 								} else if ist == regex.ist_group_end {
-									buf2.write_string('GROUP_END   #:${re.prog[state.pc].group_id} deep:$state.group_index')
+									buf2.write_string('GROUP_END   #:${re.prog[state.pc].group_id} REP:${state.rep[state.pc]} TM:${token_match} ')
 								}
-								
-							}
-							if re.prog[state.pc].rep_max == regex.max_quantifier {
-								buf2.write_string('{${re.prog[state.pc].rep_min},MAX}:${state.rep[state.pc]}')
-							} else {
-								buf2.write_string('{${re.prog[state.pc].rep_min},${re.prog[state.pc].rep_max}}:${state.rep[state.pc]}')
-							}
-							if re.prog[state.pc].greedy == true {
-								buf2.write_string('?')
-							}
-							//buf2.write_string(' (#$state.group_index)')
+									
+								if re.prog[state.pc].rep_max == regex.max_quantifier {
+									buf2.write_string('{${re.prog[state.pc].rep_min},MAX}:${state.rep[state.pc]}')
+								} else {
+									buf2.write_string('{${re.prog[state.pc].rep_min},${re.prog[state.pc].rep_max}}:${state.rep[state.pc]}')
+								}
+								if re.prog[state.pc].greedy == true {
+									buf2.write_string('?')
+								}
+								//buf2.write_string(' (#$state.group_index)')
 
+							}
 							buf2.write_string('\n')
+							sss2 := buf2.str()
+							re.log_func(sss2)
 						}
-						sss2 := buf2.str()
-						re.log_func(sss2)
 					}
+
+					step_count++
 				}
-				step_count++
 			}
 			//******************************************
 			
 			if ist == regex.ist_prog_end {
 				// println("HERE we end!")
-				break
-			}
-
-			// load the char
-			ch, char_len = re.get_charb(in_txt, state.i)
-
-			// check new line if flag f_nl enabled
-			if (re.flag & regex.f_nl) != 0 && char_len == 1 && u8(ch) in regex.new_line_list {
-				if states_index > 0 {
-					// println("this EOL branch is no godd,restore state!")
-					states_index--
-					continue
-				}
-				break
-			}			
-
-			group_id := re.prog[state.pc].group_id
-			// group start IST
-			if ist == regex.ist_group_start {
-				re.groups[group_id].i_tmp_start = state.i
-				// println("regex.ist_group_start g_index:${state.group_index}")	
-			}
-
-			// group end IST
-			else if ist == regex.ist_group_end {
-				state.rep[state.pc]++
-				re.groups[group_id].i_start = re.groups[group_id].i_tmp_start
 				re.groups[group_id].i_end = state.i
+				re.groups[group_id].i_start = state.match_start
+				re.groups[group_id].i_tmp_start = -1
+				break
 			}
 
-			// char class IST
-			else if ist == regex.ist_char_class_pos || ist == regex.ist_char_class_neg {
-				token_match = false
-				mut cc_neg := false
-				if ist == regex.ist_char_class_neg {
-					cc_neg = true
-				}
+			if !out_of_text {
+				// load the char
+				ch, char_len = re.get_charb(in_txt, state.i)
+
+				// check new line if flag f_nl enabled
+				if (re.flag & regex.f_nl) != 0 && char_len == 1 && u8(ch) in regex.new_line_list {
+					if states_index > 0 {
+						// println("this EOL branch is no godd,restore state!")
+						states_index--
+						continue
+					}
+					break
+				}			
+
 				
-				mut cc_res := re.check_char_class(state.pc, ch)
-
-				if cc_neg {
-					cc_res = !cc_res
+				// group start IST
+				if ist == regex.ist_group_start {
+					re.groups[group_id].i_tmp_start = state.i
+					// println("regex.ist_group_start g_index:${state.group_index}")	
 				}
 
-				if cc_res == true {
+				// group end IST
+				else if ist == regex.ist_group_end {
+					if token_match == true {
+						state.rep[state.pc]++
+						re.groups[group_id].i_start = re.groups[group_id].i_tmp_start
+						re.groups[group_id].i_end = state.i
+						re.groups[group_id].i_tmp_start = -1
+					}
+
+					if token_match == false {
+						println("regex.ist_group_end on token_match FALSE")
+					}
+				}
+
+				// char class IST
+				else if ist == regex.ist_char_class_pos || ist == regex.ist_char_class_neg {
+					token_match = false
+					mut cc_neg := false
+					if ist == regex.ist_char_class_neg {
+						cc_neg = true
+					}
+					
+					mut cc_res := re.check_char_class(state.pc, ch)
+
+					if cc_neg {
+						cc_res = !cc_res
+					}
+
+					if cc_res == true {
+						token_match = true
+						if state.match_start < 0 {
+							state.match_start = state.i
+						} else {
+							state.match_end = state.i + char_len
+						}
+
+						state.rep[state.pc]++ // increase repetitions
+						state.i += char_len // next char
+					}
+					
+				}
+
+				// dot_char IST
+				else if ist == regex.ist_dot_char {
 					token_match = true
 					if state.match_start < 0 {
 						state.match_start = state.i
@@ -205,53 +237,40 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					state.rep[state.pc]++ // increase repetitions
 					state.i += char_len // next char
 				}
-				
-			}
 
-			// dot_char IST
-			else if ist == regex.ist_dot_char {
-				token_match = true
-				if state.match_start < 0 {
-					state.match_start = state.i
-				} else {
-					state.match_end = state.i + char_len
-				}
+				// bsls IST
+				else if ist == regex.ist_bsls_char {
+					token_match = false
+					if re.prog[state.pc].validator(u8(ch)) {
+						token_match = true
+						if state.match_start < 0 {
+							state.match_start = state.i
+						} else {
+							state.match_end = state.i + char_len
+						}
 
-				state.rep[state.pc]++ // increase repetitions
-				state.i += char_len // next char
-			}
-
-			// bsls IST
-			else if ist == regex.ist_bsls_char {
-				token_match = false
-				if re.prog[state.pc].validator(u8(ch)) {
-					token_match = true
-					if state.match_start < 0 {
-						state.match_start = state.i
-					} else {
-						state.match_end = state.i + char_len
+						state.rep[state.pc]++ // increase repetitions
+						state.i += char_len // next char
 					}
-
-					state.rep[state.pc]++ // increase repetitions
-					state.i += char_len // next char
 				}
-			}
 
-			// simple char IST
-			else if ist == regex.ist_simple_char {
-				token_match = false
-				if re.prog[state.pc].ch == ch {
-					token_match = true
-					if state.match_start < 0 {
-						state.match_start = state.i
-					} else {
-						state.match_end = state.i + char_len
+				// simple char IST
+				else if ist == regex.ist_simple_char {
+					token_match = false
+					if re.prog[state.pc].ch == ch {
+						token_match = true
+						if state.match_start < 0 {
+							state.match_start = state.i
+						} else {
+							state.match_end = state.i + char_len
+						}
+
+						state.rep[state.pc]++ // increase repetitions
+						state.i += char_len // next char
 					}
-
-					state.rep[state.pc]++ // increase repetitions
-					state.i += char_len // next char
 				}
-			}
+
+			} // end if !out_of_text
 
 			//******************************************
 			// Check quantifier
@@ -261,6 +280,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			rep_max    := re.prog[state.pc].rep_max
 			greedy     := re.prog[state.pc].greedy
 			save_state := re.prog[state.pc].save_state
+
 
 			//
 			// Quntifier for start group token
@@ -276,10 +296,14 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			// 
 			if ist == regex.ist_group_end {
 				// we have a fail in a group but enough repetitions
-				if token_match == false &&  
-					re.prog[state.pc + 1].ist != regex.ist_prog_end
+
+				println("rep: ${rep} token_match: ${token_match}")
+				// println("re.prog[${state.pc}]: ${re.prog[state.pc]}")
+				
+				if token_match == false // && re.prog[state.pc + 1].ist != regex.ist_prog_end
 				{
 					if rep >= rep_min && rep <= rep_max {
+						println("*************** we can continue! ***************")
 						if re.prog[state.pc].or_flag == true {
 							state.pc++
 						}
@@ -322,17 +346,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					continue
 				}
 				// we are satisfied
-				if rep >= rep_min && rep < rep_max {
-/*					
-					// greedy flag management
-					if greedy == true {
-						if re.prog[state.pc].or_flag == true {
-							state.pc++
-						}
-						state.pc++
-					}
-*/					
-					
+				if rep >= rep_min && rep < rep_max {			
 					// we need to manage the state
 					// in order to keep track of the next tokens
 					if save_state == true &&  
@@ -397,6 +411,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					if re.prog[state.pc].ist != regex.ist_group_end {
 						state.rep[state.pc] = 0
 					}
+					token_match = true
 					continue
 				}
 
@@ -405,6 +420,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				// we have to solve precedent situations, get old status
 				if states_index > 0 {
 					states_index--
+					println("Restore state: ${states_index}")
 					continue
 				}
 
@@ -417,22 +433,35 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					continue
 				}
 
+/*
 				// we are in a group
 				if group_id > 0 {
-					tmp_pc := re.groups[group_id].pc_end
+					token_match = false
+					
+					mut tmp_pc := re.groups[group_id].pc_end
+					
 					println("We are in group failed match! group_index:${group_id} states_index:${states_index}")
 					println("tmp_pc: $tmp_pc rep_min:${re.prog[tmp_pc].rep_min} rep: ${state.rep[tmp_pc]}")
 					
-					println("OK we can continue, got to ist_group_end!")
-					state.pc = tmp_pc
+					println("OK we can continue, go after ist_group_end!")
+					print(re.prog[tmp_pc])
+					
+					if re.prog[tmp_pc].or_flag == true {
+						tmp_pc++
+					}
+					
 					state.i = re.groups[group_id].i_end
 					if state.match_end > state.i {
 						state.match_end = state.i
 					}
+
+					
+					
+					state.pc = tmp_pc + 1
 					continue
 					
 				}
-				
+*/				
 				// no alternatives, break
 				break
 			}

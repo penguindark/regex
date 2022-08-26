@@ -995,7 +995,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 		// ifthe next token is a token that doesn't require save state
 		// avoid to save the state
 		if re.prog[pc].rep_max > 1 &&
-			!(re.prog[pc + 1].ist in [regex.ist_group_end, regex.ist_prog_end, regex.ist_simple_char])
+			!(re.prog[pc + 1].ist in [regex.ist_group_end, regex.ist_prog_end])
 		{
 			re.prog[pc].save_state = true
 			last_save_state_pc =pc
