@@ -125,7 +125,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 							buf2.write_string('GROUP_END   #:${re.prog[state.pc].group_id} REP:${state.rep[state.pc]} TM:${token_match} ')
 						}
 					}
-					
+
 					if re.prog[state.pc].rep_max == regex.max_quantifier {
 						buf2.write_string('{${re.prog[state.pc].rep_min},MAX}=${state.rep[state.pc]}')
 					} else {
@@ -159,9 +159,9 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			//******************************************
 			out_of_text = false
 			// check out of text
-			if state.i >= in_txt_len {
+			if state.i > in_txt_len {
 
-				// debug print
+				// debug log
 				if re.debug > 0 {
 					mut buf2 := strings.new_builder(re.cc.len + 128)
 					buf2.write_string('# ${step_count:3d} END OF INPUT TEXT\n')

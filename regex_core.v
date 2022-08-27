@@ -1006,7 +1006,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	}
 
 	// with only one have no sense to store the state
-	if save_state_count >= 1 {
+	if save_state_count > 1 {
 		re.prog[last_save_state_pc].save_state = false
 	}
 	
