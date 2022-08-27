@@ -24,10 +24,11 @@ mut:
 	rep []int // counters for quantifier check (repetitions)
 }
 
-[inline]
+[inline; direct_array_access]
 fn (mut re RE) get_next_token_pc(tmp_pc int) int {
 	mut tmp_or_pc := tmp_pc
 	for re.prog[tmp_or_pc].or_flag == true {
+		println("We have OR!")
 		if re.prog[tmp_or_pc].ist == regex.ist_group_start {
 			tmp_or_pc = re.groups[re.prog[tmp_or_pc].group_id].pc_end + 1
 			continue
@@ -35,6 +36,7 @@ fn (mut re RE) get_next_token_pc(tmp_pc int) int {
 		tmp_or_pc++
 	}
 	tmp_or_pc++
+	println("Result PC: $tmp_or_pc")
 	return tmp_or_pc
 }
 
@@ -75,13 +77,102 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			mut state := &states_stack[states_index]
 			// println("states_index: ${states_index} PC: ${state.pc} i: ${state.i} txt_len:${in_txt_len}")
 
+			// load the instruction
+			if state.pc >= 0 && state.pc < re.prog.len {
+				ist = re.prog[state.pc].ist
+				group_id = re.prog[state.pc].group_id
+			} else if state.pc >= re.prog.len {
+				// eprintln("ERROR!! PC overflow!!")
+				return regex.err_internal_error, state.i
+			}
+
+			//******************************************
+			// Debug log
+			//******************************************
+			if re.debug > 0 {
+				mut buf2 := strings.new_builder(re.cc.len + 128)
+
+				if re.debug == 1 || re.debug == 2 {
+					if ist == regex.ist_prog_end {
+						buf2.write_string('# ${step_count:3d} PROG_END\n')
+					
+					} else {
+						ch, char_len = re.get_charb(in_txt, state.i)
+						buf2.write_string('# ${step_count:3d} GRP:${re.prog[state.pc].group_id:2d} SI:${states_index:2d} PC: ${state.pc:3d}=>')
+						// buf2.write_string('${ist:8x}'.replace(' ', '0'))
+						buf2.write_string(" i,ch,len:[${state.i:3d},'${utf8_str(ch)}',$char_len] f.m:[${state.match_start:3d},${state.match_end:3d}] ")
+
+						if ist == regex.ist_simple_char {
+							buf2.write_string('query_ch: [${re.prog[state.pc].ch:1c}]')
+						} else {
+							if ist == regex.ist_bsls_char {
+								buf2.write_string('BSLS [\\${re.prog[state.pc].ch:1c}]')
+							} else if ist == regex.ist_prog_end {
+								buf2.write_string('PROG_END')
+							} else if ist == regex.ist_or_branch {
+								buf2.write_string('OR')
+							} else if ist == regex.ist_char_class_pos {
+								buf2.write_string('CHAR_CLASS_POS[${re.get_char_class(state.pc)}]')
+							} else if ist == regex.ist_char_class_neg {
+								buf2.write_string('CHAR_CLASS_NEG[${re.get_char_class(state.pc)}]')
+							} else if ist == regex.ist_dot_char {
+								buf2.write_string('DOT_CHAR')
+							} 
+							else if ist == regex.ist_group_start {
+								tmp_gi := re.prog[state.pc].group_id
+								//tmp_gr := re.prog[re.prog[state.pc].goto_pc].group_rep
+								//buf2.write_string('GROUP_START #:$tmp_gi rep:$tmp_gr ')
+								buf2.write_string('GROUP_START #:$tmp_gi REP:${state.rep[state.pc]} ')
+							} else if ist == regex.ist_group_end {
+								buf2.write_string('GROUP_END   #:${re.prog[state.pc].group_id} REP:${state.rep[state.pc]} TM:${token_match} ')
+							}
+								
+							if re.prog[state.pc].rep_max == regex.max_quantifier {
+								buf2.write_string('{${re.prog[state.pc].rep_min},MAX}:${state.rep[state.pc]}')
+							} else {
+								buf2.write_string('{${re.prog[state.pc].rep_min},${re.prog[state.pc].rep_max}}:${state.rep[state.pc]}')
+							}
+							if re.prog[state.pc].greedy == true {
+								buf2.write_string('?')
+							}
+							//buf2.write_string(' (#$state.group_index)')
+
+						}
+						buf2.write_string('\n')
+						sss2 := buf2.str()
+						re.log_func(sss2)
+					}
+				}
+
+				step_count++
+				
+			}
+			//******************************************
+			
+			if ist == regex.ist_prog_end {
+				// println("HERE we end!")
+				re.groups[group_id].i_end = state.i
+				re.groups[group_id].i_start = state.match_start
+				re.groups[group_id].i_tmp_start = -1
+				break
+			}
+
 			//******************************************
 			// Out of Text management
 			//******************************************
 			out_of_text = false
 			// check out of text
 			if state.i >= in_txt_len {
-				println("out_of_text!")
+
+				// debug print
+				if re.debug > 0 {
+					mut buf2 := strings.new_builder(re.cc.len + 128)
+					buf2.write_string('# ${step_count:3d} END OF INPUT TEXT\n')
+					buf2.write_string('\n')
+					sss2 := buf2.str()
+					re.log_func(sss2)
+				}
+				
 				// we are out of text
 				out_of_text = state.i >= in_txt_len
 				token_match = false
@@ -101,95 +192,6 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					continue
 				}
 
-				break
-			}
-
-			// load the instruction
-			if state.pc >= 0 && state.pc < re.prog.len {
-				ist = re.prog[state.pc].ist
-				group_id = re.prog[state.pc].group_id
-			} else if state.pc >= re.prog.len {
-				// eprintln("ERROR!! PC overflow!!")
-				return regex.err_internal_error, state.i
-			}
-
-			//******************************************
-			// Debug log
-			//******************************************
-			if re.debug > 0 {
-				mut buf2 := strings.new_builder(re.cc.len + 128)
-
-				// print all the instructions
-
-				// end of the input text
-				if out_of_text {
-					buf2.write_string('# ${step_count:3d} END OF INPUT TEXT\n')
-					sss := buf2.str()
-					re.log_func(sss)
-				} else {
-					// print only the exe instruction
-					if re.debug == 1 || re.debug == 2 {
-						if ist == regex.ist_prog_end {
-							buf2.write_string('# ${step_count:3d} PROG_END\n')
-						
-						} else {
-							ch, char_len = re.get_charb(in_txt, state.i)
-							buf2.write_string('# ${step_count:3d} GRP:${re.prog[state.pc].group_id:2d} SI:${states_index:2d} PC: ${state.pc:3d}=>')
-							// buf2.write_string('${ist:8x}'.replace(' ', '0'))
-							buf2.write_string(" i,ch,len:[${state.i:3d},'${utf8_str(ch)}',$char_len] f.m:[${state.match_start:3d},${state.match_end:3d}] ")
-
-							if ist == regex.ist_simple_char {
-								buf2.write_string('query_ch: [${re.prog[state.pc].ch:1c}]')
-							} else {
-								if ist == regex.ist_bsls_char {
-									buf2.write_string('BSLS [\\${re.prog[state.pc].ch:1c}]')
-								} else if ist == regex.ist_prog_end {
-									buf2.write_string('PROG_END')
-								} else if ist == regex.ist_or_branch {
-									buf2.write_string('OR')
-								} else if ist == regex.ist_char_class_pos {
-									buf2.write_string('CHAR_CLASS_POS[${re.get_char_class(state.pc)}]')
-								} else if ist == regex.ist_char_class_neg {
-									buf2.write_string('CHAR_CLASS_NEG[${re.get_char_class(state.pc)}]')
-								} else if ist == regex.ist_dot_char {
-									buf2.write_string('DOT_CHAR')
-								} 
-								else if ist == regex.ist_group_start {
-									tmp_gi := re.prog[state.pc].group_id
-									//tmp_gr := re.prog[re.prog[state.pc].goto_pc].group_rep
-									//buf2.write_string('GROUP_START #:$tmp_gi rep:$tmp_gr ')
-									buf2.write_string('GROUP_START #:$tmp_gi REP:${state.rep[state.pc]} ')
-								} else if ist == regex.ist_group_end {
-									buf2.write_string('GROUP_END   #:${re.prog[state.pc].group_id} REP:${state.rep[state.pc]} TM:${token_match} ')
-								}
-									
-								if re.prog[state.pc].rep_max == regex.max_quantifier {
-									buf2.write_string('{${re.prog[state.pc].rep_min},MAX}:${state.rep[state.pc]}')
-								} else {
-									buf2.write_string('{${re.prog[state.pc].rep_min},${re.prog[state.pc].rep_max}}:${state.rep[state.pc]}')
-								}
-								if re.prog[state.pc].greedy == true {
-									buf2.write_string('?')
-								}
-								//buf2.write_string(' (#$state.group_index)')
-
-							}
-							buf2.write_string('\n')
-							sss2 := buf2.str()
-							re.log_func(sss2)
-						}
-					}
-
-					step_count++
-				}
-			}
-			//******************************************
-			
-			if ist == regex.ist_prog_end {
-				// println("HERE we end!")
-				re.groups[group_id].i_end = state.i
-				re.groups[group_id].i_start = state.match_start
-				re.groups[group_id].i_tmp_start = -1
 				break
 			}
 
@@ -391,7 +393,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					if save_state == true &&  
 						re.prog[return_pc].ist != regex.ist_prog_end
 					{
-						println("Save state!")
+						// println("Save state!")
 						// we have not this level, create it
 						if states_index >= states_stack.len - 1 { 
 							// println("Create New state!")
