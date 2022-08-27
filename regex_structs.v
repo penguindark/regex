@@ -5,7 +5,7 @@ Copyright (c) 2019-2022 Dario Deledda. All rights reserved.
 Use of this source code is governed by an MIT license
 that can be found in the LICENSE file.
 
-This file contains regex structs and base const
+This file contains regex structs and base constants
 
 Know limitation:
 

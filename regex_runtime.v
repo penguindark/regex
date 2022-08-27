@@ -62,13 +62,11 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 		// print header
 		mut h_buf := strings.new_builder(32)
 		h_buf.write_string('flags: ')
-		h_buf.write_string('${re.flag:8x}'.replace(' ', '0'))
+		h_buf.write_string('${re.flag:08x}')
 		h_buf.write_string('\n')
 		sss := h_buf.str()
 		re.log_func(sss)
 	}
-
-	
 
 	unsafe{	
 		for {
@@ -83,8 +81,6 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				// eprintln("ERROR!! PC overflow!!")
 				return regex.err_internal_error, state.i
 			}
-
-			
 
 			//******************************************
 			// Debug log
@@ -141,7 +137,6 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				sss2 := buf2.str()
 				re.log_func(sss2)
 				step_count++
-				
 			}
 			//******************************************
 			
@@ -320,7 +315,6 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			greedy     := re.prog[state.pc].greedy
 			save_state := re.prog[state.pc].save_state
 
-
 			//
 			// Quntifier for start group token
 			// 
@@ -368,11 +362,9 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 			}
 
-
 			//
-			// Quntifier for tokens
+			// Quantifier for tokens
 			//
-
 			mut return_pc := state.pc
 			if ist == regex.ist_group_end {
 				return_pc++
@@ -458,7 +450,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					continue
 				}
 
-				// we have an OR try it
+				// we have an OR? If yes try it!
 				if re.prog[state.pc].or_flag == true {
 					state.pc++
 					if re.prog[state.pc].ist != regex.ist_group_end {
@@ -471,7 +463,6 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				break
 			}
 			
-		
 		}
 	} // end unsafe
 
@@ -488,7 +479,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 	}
 
 	// check if query is satisfied even before the ist_prog_end
-	// start from the first token before the ist_prog_end
+	// start from the first token before the ist_prog_end and go backward
 	mut tmp_pc := re.prog_len - 1 
 	for tmp_pc >= 0 {
 		rep := state.rep[tmp_pc]
