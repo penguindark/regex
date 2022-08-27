@@ -1,3 +1,15 @@
+/*
+regex 2.0 alpha
+
+Copyright (c) 2019-2022 Dario Deledda. All rights reserved.
+Use of this source code is governed by an MIT license
+that can be found in the LICENSE file.
+
+This file contains regex debug functions
+
+Know limitation:
+
+*/
 module regex
 
 import strings
