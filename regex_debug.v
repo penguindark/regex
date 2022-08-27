@@ -24,8 +24,6 @@ pub fn (re RE) get_code() string {
 		} else if ist == regex.ist_prog_end {
 			res.write_string('PROG_END')
 			stop_flag = true
-		} else if ist == regex.ist_or_branch {
-			res.write_string('OR      ')
 		} else if ist == regex.ist_char_class_pos {
 			res.write_string('[${re.get_char_class(pc1)}]     CHAR_CLASS_POS')
 		} else if ist == regex.ist_char_class_neg {
@@ -73,7 +71,7 @@ pub fn (re RE) get_code() string {
 		}
 
 		if tk.or_flag == true {
-			res.write_string('\nOR')
+			res.write_string('\n---- OR ----')
 		}
 
 		res.write_string('\n')
