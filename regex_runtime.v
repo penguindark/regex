@@ -24,6 +24,20 @@ mut:
 	rep []int // counters for quantifier check (repetitions)
 }
 
+[inline]
+fn (mut re RE) get_next_token_pc(tmp_pc int) int {
+	mut tmp_or_pc := tmp_pc
+	for re.prog[tmp_or_pc].or_flag == true {
+		if re.prog[tmp_or_pc].ist == regex.ist_group_start {
+			tmp_or_pc = re.groups[re.prog[tmp_or_pc].group_id].pc_end + 1
+			continue
+		}
+		tmp_or_pc++
+	}
+	tmp_or_pc++
+	return tmp_or_pc
+}
+
 [direct_array_access]
 pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 	// result status
@@ -63,7 +77,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 			out_of_text = false
 			// check out of text
-			if state.i > in_txt_len {
+			if state.i >= in_txt_len {
 				println("out_of_text!")
 				// we are out of text
 				out_of_text = state.i >= in_txt_len
@@ -396,11 +410,8 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 						states_stack[states_index].rep = state.rep.clone()
 
-
-						tmp_pc := states_stack[states_index].pc + 1
-						if re.prog[state.pc].or_flag == true {
-							tmp_pc++
-						}
+						// skip OR sequence if any
+						tmp_pc := re.get_next_token_pc(states_stack[states_index].pc)
 						
 						states_stack[states_index].pc = tmp_pc
 						states_stack[states_index].rep[tmp_pc] = 0
@@ -409,10 +420,9 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					continue
 				}
 				if rep == rep_max {
-					if re.prog[state.pc].or_flag == true {
-						state.pc++
-					}
-					state.pc++
+					println("Here max!!")
+					state.pc = re.get_next_token_pc(state.pc)
+					
 					if re.prog[state.pc].ist != regex.ist_group_end {
 						state.rep[state.pc] = 0
 					}
@@ -421,11 +431,8 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			} else {
 				// we have enough token, continue anyway
 				if rep >= rep_min && rep <= rep_max {
-					//skip OR token
-					if re.prog[state.pc].or_flag == true {
-						state.pc++
-					}
-					state.pc++
+					state.pc = re.get_next_token_pc(state.pc)
+
 					if re.prog[state.pc].ist != regex.ist_group_end {
 						state.rep[state.pc] = 0
 					}
@@ -473,29 +480,29 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 	// check if query is satisfied even before the ist_prog_end
 	// start from the first token before the ist_prog_end
-	mut i := re.prog_len - 1 
-	for i >= 0 {
-		rep := state.rep[i]
+	mut tmp_pc := re.prog_len - 1 
+	for tmp_pc >= 0 {
+		rep := state.rep[tmp_pc]
 		// println("ending check: i: ${i} rep: ${rep} rep_min: ${re.prog[i].rep_min}")
-		if rep == 0 && re.prog[i].rep_min == 0 {
-			if re.prog[i].ist != regex.ist_group_end {
+		if rep == 0 && re.prog[tmp_pc].rep_min == 0 {
+			if re.prog[tmp_pc].ist != regex.ist_group_end {
 				// not a ist_group_end, check previous token
-				i-- 
+				tmp_pc-- 
 			} else {
 				// we are at the end of a group, go at the token before the group start
-				i = re.groups[re.prog[i].group_id].pc_start - 1
+				tmp_pc = re.groups[re.prog[tmp_pc].group_id].pc_start - 1
 			}
 			continue
 		}
 
 		// no match found exit
-		if rep < re.prog[i].rep_min {
+		if rep < re.prog[tmp_pc].rep_min {
 			break
 		}
 
 		// if we exit on out_of_text the match_end = in_txt_len
 		match_end := if out_of_text { in_txt_len } else {state.match_end - char_len }
-		if rep >= re.prog[i].rep_min {
+		if rep >= re.prog[tmp_pc].rep_min {
 			re.groups[0].i_start = state.match_start
 			re.groups[0].i_end = match_end
 			return state.match_start, match_end
