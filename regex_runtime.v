@@ -135,7 +135,6 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 						buf2.write_string('?')
 					}
 					//buf2.write_string(' (#$state.group_index)')
-					
 				}
 
 				buf2.write_string('\n')
@@ -159,7 +158,10 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			//******************************************
 			out_of_text = false
 			// check out of text
-			if state.i > in_txt_len {
+			// NOTE: We must have the 0 at the end of the string,
+			// C Style strings!!
+			// TO investigate >= vs > in this IF
+			if state.i >= in_txt_len {
 
 				// debug log
 				if re.debug > 0 {
@@ -184,7 +186,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 				// we have some cards to play, continue with th eold state
 				if states_index > 0 {
-					println("Restore State! this Out of text branch is no godd,restore state!")
+					println("Restore State! this Out of text branch is not good, restore state!")
 					states_index--
 					continue
 				}
