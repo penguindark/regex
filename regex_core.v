@@ -995,27 +995,18 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	for pc < re.prog_len {
 		// if the next token is a token that doesn't require save state
 		// avoid to save the state
-		if re.prog[pc].rep_max > 1 &&
-			!(re.prog[pc + 1].ist in [regex.ist_group_end, regex.ist_prog_end])
+		if re.prog[pc].rep_max > 1 
+		//&& !(re.prog[pc + 1].ist in [regex.ist_group_end, regex.ist_prog_end])
 		{
 			re.prog[pc].save_state = true
-			last_save_state_pc =pc
+			last_save_state_pc = pc
 			save_state_count++
 		}
 		pc++
 	}
 
-	// the last save_state must be false
-	// if it is the last instruction before the end program token
-
-	if last_save_state_pc == re.prog_len - 1 && 
-		re.prog[last_save_state_pc].ist != regex.ist_group_end
-	{
-		re.prog[last_save_state_pc].save_state = false
-	}
-
 	// with only one have no sense to store the state
-	if save_state_count == 1 {
+	if save_state_count >= 1 {
 		re.prog[last_save_state_pc].save_state = false
 	}
 	
