@@ -175,72 +175,84 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				break
 			}
 
-			//if !out_of_text {
-			if true {
-				// load the char
-				ch, char_len = re.get_charb(in_txt, state.i)
+			// load the char
+			ch, char_len = re.get_charb(in_txt, state.i)
 
-				// check new line if flag f_nl enabled
-				if (re.flag & regex.f_nl) != 0 && char_len == 1 && u8(ch) in regex.new_line_list {
-					if states_index > 0 {
-						// println("this EOL branch is no godd,restore state!")
-						states_index--
-						continue
-					}
-					break
-				}			
+			// check new line if flag f_nl enabled
+			if (re.flag & regex.f_nl) != 0 && char_len == 1 && u8(ch) in regex.new_line_list {
+				if states_index > 0 {
+					// println("this EOL branch is no godd,restore state!")
+					states_index--
+					continue
+				}
+				break
+			}			
 
+			
+			// group start IST
+			if ist == regex.ist_group_start {
+				re.groups[group_id].i_tmp_start = state.i
+				// println("regex.ist_group_start g_index:${state.group_index}")	
+			}
+
+			// group end IST
+			else if ist == regex.ist_group_end {
+				if token_match == true {
+					state.rep[state.pc]++
+					re.groups[group_id].i_start = re.groups[group_id].i_tmp_start
+					re.groups[group_id].i_end = state.i
+					re.groups[group_id].i_tmp_start = -1
+				}
+
+				if token_match == false {
+					println("regex.ist_group_end on token_match FALSE")
+				}
+			}
+
+			// char class IST
+			else if ist == regex.ist_char_class_pos || ist == regex.ist_char_class_neg {
+				token_match = false
+				mut cc_neg := false
+				if ist == regex.ist_char_class_neg {
+					cc_neg = true
+				}
 				
-				// group start IST
-				if ist == regex.ist_group_start {
-					re.groups[group_id].i_tmp_start = state.i
-					// println("regex.ist_group_start g_index:${state.group_index}")	
+				mut cc_res := re.check_char_class(state.pc, ch)
+
+				if cc_neg {
+					cc_res = !cc_res
 				}
 
-				// group end IST
-				else if ist == regex.ist_group_end {
-					if token_match == true {
-						state.rep[state.pc]++
-						re.groups[group_id].i_start = re.groups[group_id].i_tmp_start
-						re.groups[group_id].i_end = state.i
-						re.groups[group_id].i_tmp_start = -1
+				if cc_res == true {
+					token_match = true
+					if state.match_start < 0 {
+						state.match_start = state.i
+					} else {
+						state.match_end = state.i + char_len
 					}
 
-					if token_match == false {
-						println("regex.ist_group_end on token_match FALSE")
-					}
+					state.rep[state.pc]++ // increase repetitions
+					state.i += char_len // next char
+				} 					
+			}
+
+			// dot_char IST
+			else if ist == regex.ist_dot_char {
+				token_match = true
+				if state.match_start < 0 {
+					state.match_start = state.i
+				} else {
+					state.match_end = state.i + char_len
 				}
 
-				// char class IST
-				else if ist == regex.ist_char_class_pos || ist == regex.ist_char_class_neg {
-					token_match = false
-					mut cc_neg := false
-					if ist == regex.ist_char_class_neg {
-						cc_neg = true
-					}
-					
-					mut cc_res := re.check_char_class(state.pc, ch)
+				state.rep[state.pc]++ // increase repetitions
+				state.i += char_len // next char
+			}
 
-					if cc_neg {
-						cc_res = !cc_res
-					}
-
-					if cc_res == true {
-						token_match = true
-						if state.match_start < 0 {
-							state.match_start = state.i
-						} else {
-							state.match_end = state.i + char_len
-						}
-
-						state.rep[state.pc]++ // increase repetitions
-						state.i += char_len // next char
-					}
-					
-				}
-
-				// dot_char IST
-				else if ist == regex.ist_dot_char {
+			// bsls IST
+			else if ist == regex.ist_bsls_char {
+				token_match = false
+				if re.prog[state.pc].validator(u8(ch)) {
 					token_match = true
 					if state.match_start < 0 {
 						state.match_start = state.i
@@ -251,40 +263,31 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					state.rep[state.pc]++ // increase repetitions
 					state.i += char_len // next char
 				}
+			}
 
-				// bsls IST
-				else if ist == regex.ist_bsls_char {
-					token_match = false
-					if re.prog[state.pc].validator(u8(ch)) {
-						token_match = true
-						if state.match_start < 0 {
-							state.match_start = state.i
-						} else {
-							state.match_end = state.i + char_len
-						}
-
-						state.rep[state.pc]++ // increase repetitions
-						state.i += char_len // next char
+			// simple char IST
+			else if ist == regex.ist_simple_char {
+				token_match = false
+				if re.prog[state.pc].ch == ch {
+					token_match = true
+					if state.match_start < 0 {
+						state.match_start = state.i
+					} else {
+						state.match_end = state.i + char_len
 					}
+
+					state.rep[state.pc]++ // increase repetitions
+					state.i += char_len // next char
 				}
+			}
 
-				// simple char IST
-				else if ist == regex.ist_simple_char {
-					token_match = false
-					if re.prog[state.pc].ch == ch {
-						token_match = true
-						if state.match_start < 0 {
-							state.match_start = state.i
-						} else {
-							state.match_end = state.i + char_len
-						}
+			// we have other branches to explore, do it!
+			if token_match == false && states_index > 0 {
+					states_index--
+					continue
+			}
 
-						state.rep[state.pc]++ // increase repetitions
-						state.i += char_len // next char
-					}
-				}
-
-			} // end if !out_of_text
+			
 
 			//******************************************
 			// Check quantifier
@@ -448,35 +451,6 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					continue
 				}
 
-/*
-				// we are in a group
-				if group_id > 0 {
-					token_match = false
-					
-					mut tmp_pc := re.groups[group_id].pc_end
-					
-					println("We are in group failed match! group_index:${group_id} states_index:${states_index}")
-					println("tmp_pc: $tmp_pc rep_min:${re.prog[tmp_pc].rep_min} rep: ${state.rep[tmp_pc]}")
-					
-					println("OK we can continue, go after ist_group_end!")
-					print(re.prog[tmp_pc])
-					
-					if re.prog[tmp_pc].or_flag == true {
-						tmp_pc++
-					}
-					
-					state.i = re.groups[group_id].i_end
-					if state.match_end > state.i {
-						state.match_end = state.i
-					}
-
-					
-					
-					state.pc = tmp_pc + 1
-					continue
-					
-				}
-*/				
 				// no alternatives, break
 				break
 			}
@@ -485,6 +459,9 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 		}
 	} // end unsafe
 
+	//******************************************
+	// Exit check
+	//******************************************
 	state := states_stack[states_index]
 
 	// normal exit if match 
@@ -494,15 +471,16 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 		return state.match_start, state.match_end
 	}
 
-	println("Here! p len: ${re.prog_len}")
-	// check if query is satisfied
-	mut i := re.prog_len - 1 // start from the first token before the ist_prog_end
+	// check if query is satisfied even before the ist_prog_end
+	// start from the first token before the ist_prog_end
+	mut i := re.prog_len - 1 
 	for i >= 0 {
 		rep := state.rep[i]
-		// println("ending: i: ${i} rep: ${rep} rep_min: ${re.prog[i].rep_min}")
+		// println("ending check: i: ${i} rep: ${rep} rep_min: ${re.prog[i].rep_min}")
 		if rep == 0 && re.prog[i].rep_min == 0 {
 			if re.prog[i].ist != regex.ist_group_end {
-				i-- // not a ist_group_end, check previous token
+				// not a ist_group_end, check previous token
+				i-- 
 			} else {
 				// we are at the end of a group, go at the token before the group start
 				i = re.groups[re.prog[i].group_id].pc_start - 1
@@ -510,19 +488,18 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			continue
 		}
 
-		// no match exit
+		// no match found exit
 		if rep < re.prog[i].rep_min {
 			break
 		}
 
+		// if we exit on out_of_text the match_end = in_txt_len
 		match_end := if out_of_text { in_txt_len } else {state.match_end - char_len }
-
 		if rep >= re.prog[i].rep_min {
 			re.groups[0].i_start = state.match_start
 			re.groups[0].i_end = match_end
 			return state.match_start, match_end
 		}
-
 	}
 
 	println("Temp result: ${state.match_start},${state.match_end - char_len}")
