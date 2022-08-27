@@ -486,32 +486,44 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 	} // end unsafe
 
 	state := states_stack[states_index]
+
+	// normal exit if match 
 	if ist == regex.ist_prog_end {
+		re.groups[0].i_start = state.match_start
+		re.groups[0].i_end = state.match_end
 		return state.match_start, state.match_end
 	}
 
-	if state.i > in_txt_len && 
-		re.prog[state.pc + 1 ].ist == regex.ist_prog_end &&
-		token_match == true
-	{
-			//print("Here!")
-			return state.match_start, state.match_end - char_len
-	}
-
-	// check if last token has enough rep to exit with a match
-	if re.prog[state.pc].ist != regex.ist_prog_end {
-		tmp_pc := re.prog_len - 1
-		rep := state.rep[tmp_pc]
-		// println("tmp_pc: ${tmp_pc} rep: ${rep}")
-		if rep > re.prog[tmp_pc].rep_min {
-			// return state.match_start, state.match_end - char_len
-			re.groups[0].i_start = state.match_start
-			re.groups[0].i_end = state.match_end
-
-			return state.match_start, state.match_end
+	println("Here! p len: ${re.prog_len}")
+	// check if query is satisfied
+	mut i := re.prog_len - 1 // start from the first token before the ist_prog_end
+	for i >= 0 {
+		rep := state.rep[i]
+		// println("ending: i: ${i} rep: ${rep} rep_min: ${re.prog[i].rep_min}")
+		if rep == 0 && re.prog[i].rep_min == 0 {
+			if re.prog[i].ist != regex.ist_group_end {
+				i-- // not a ist_group_end, check previous token
+			} else {
+				// we are at the end of a group, go at the token before the group start
+				i = re.groups[re.prog[i].group_id].pc_start - 1
+			}
+			continue
 		}
-	}
 
+		// no match exit
+		if rep < re.prog[i].rep_min {
+			break
+		}
+
+		match_end := if out_of_text { in_txt_len } else {state.match_end - char_len }
+
+		if rep >= re.prog[i].rep_min {
+			re.groups[0].i_start = state.match_start
+			re.groups[0].i_end = match_end
+			return state.match_start, match_end
+		}
+
+	}
 
 	println("Temp result: ${state.match_start},${state.match_end - char_len}")
 	return -1, -1
