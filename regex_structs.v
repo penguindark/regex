@@ -140,8 +140,8 @@ mut:
 	// group data
 	id int
 	name string
-	source_is int = 0
-	source_ie int = 0
+	source_is int
+	source_ie int
 	pc_start int = -1
 	pc_end   int = -1
 	// match indexes

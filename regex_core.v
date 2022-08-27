@@ -700,7 +700,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	// groups
 	mut group_count       := 0
 	mut group_index       := 0
-	mut group_stack       := []int
+	mut group_stack       := []int{}
 
 	re.groups << Group{
 		id : 0,
@@ -991,6 +991,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	// add save_state flag to all token with more then 1 repetitions
 	pc = 0
 	mut last_save_state_pc := -1
+	mut save_state_count := 0
 	for pc < re.prog_len {
 		// if the next token is a token that doesn't require save state
 		// avoid to save the state
@@ -999,6 +1000,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 		{
 			re.prog[pc].save_state = true
 			last_save_state_pc =pc
+			save_state_count++
 		}
 		pc++
 	}
@@ -1009,6 +1011,11 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	if last_save_state_pc == re.prog_len - 1 && 
 		re.prog[last_save_state_pc].ist != regex.ist_group_end
 	{
+		re.prog[last_save_state_pc].save_state = false
+	}
+
+	// with only one have no sense to store the state
+	if save_state_count == 1 {
 		re.prog[last_save_state_pc].save_state = false
 	}
 	

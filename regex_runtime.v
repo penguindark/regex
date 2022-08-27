@@ -20,7 +20,7 @@ mut:
 	pc  int
 	match_start int = -1
 	match_end   int = -1
-	group_index int = 0
+	group_index int
 	rep []int // counters for quantifier check (repetitions)
 }
 
@@ -75,6 +75,9 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			mut state := &states_stack[states_index]
 			// println("states_index: ${states_index} PC: ${state.pc} i: ${state.i} txt_len:${in_txt_len}")
 
+			//******************************************
+			// Out of Text management
+			//******************************************
 			out_of_text = false
 			// check out of text
 			if state.i >= in_txt_len {
@@ -85,14 +88,15 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 				// println("state.pc: ${state.pc} re.prog.len: ${re.prog_len}")
 				
-				// we can exit here, this is the last ist
-				if state.pc == re.prog_len - 1 {
-					// println("BREAK!")
+				// we can exit here, this is the last ist or th eprogram is ended
+				if state.pc >= re.prog_len - 1 {
+					// println("out_of_text BREAK!")
 					break
 				}
 
+				// we have some cards to play, continue with th eold state
 				if states_index > 0 {
-					// println("this Out of text branch is no godd,restore state!")
+					println("Restore State! this Out of text branch is no godd,restore state!")
 					states_index--
 					continue
 				}
@@ -110,7 +114,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			}
 
 			//******************************************
-			// DEBUG LOG
+			// Debug log
 			//******************************************
 			if re.debug > 0 {
 				mut buf2 := strings.new_builder(re.cc.len + 128)
@@ -195,7 +199,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			// check new line if flag f_nl enabled
 			if (re.flag & regex.f_nl) != 0 && char_len == 1 && u8(ch) in regex.new_line_list {
 				if states_index > 0 {
-					// println("this EOL branch is no godd,restore state!")
+					// println("Restore State! this EOL branch is no godd,restore state!")
 					states_index--
 					continue
 				}
@@ -295,12 +299,15 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				}
 			}
 
+// TO REMOVE AFTER VERIFY!!
+/*
 			// we have other branches to explore, do it!
 			if token_match == false && states_index > 0 {
-					states_index--
-					continue
+				println("Restore State! we have other branches to explore, do it!")
+				states_index--
+				continue
 			}
-
+*/
 			
 
 			//******************************************
@@ -420,7 +427,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					continue
 				}
 				if rep == rep_max {
-					println("Here max!!")
+					// println("Here max!!")
 					state.pc = re.get_next_token_pc(state.pc)
 					
 					if re.prog[state.pc].ist != regex.ist_group_end {
@@ -441,11 +448,12 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				}
 
 				// not a match
+				// print("HERE not a match!")
 
 				// we have to solve precedent situations, get old status
 				if states_index > 0 {
 					states_index--
-					println("Restore state: ${states_index}")
+					println("Restore State!  states_index:${states_index}")
 					continue
 				}
 
