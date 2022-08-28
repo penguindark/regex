@@ -142,6 +142,17 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			
 			if ist == regex.ist_prog_end {
 				// println("HERE we end!")
+
+				// NOTE: Investigate if needed in particular cases
+				/*
+				// try other ways
+				if states_index > 0 {
+					println("Restore State! End program, try other ways, restore state!")
+					states_index--
+					continue
+				}
+				*/
+
 				re.groups[group_id].i_end = state.i
 				re.groups[group_id].i_start = state.match_start
 				re.groups[group_id].i_tmp_start = -1
@@ -333,32 +344,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				println("rep: ${rep} token_match: ${token_match}")
 				// println("re.prog[${state.pc}]: ${re.prog[state.pc]}")
 				
-				if token_match == false // && re.prog[state.pc + 1].ist != regex.ist_prog_end
-				{
-					if rep >= rep_min && rep <= rep_max {
-						println("*************** we can continue! ***************")
-						if re.prog[state.pc].or_flag == true {
-							state.pc++
-						}
-						state.pc++
-						if re.prog[state.pc].ist != regex.ist_group_end {
-							state.rep[state.pc] = 0
-						}
-						continue
-					}
-				}
-
-				group_start_pc := re.prog[state.pc].group_start_pc
-				if state.rep[state.pc] < re.prog[state.pc].rep_max {
-					state.pc = group_start_pc
-					continue
-				}
-
-				state.pc++
-				if re.prog[state.pc].ist != regex.ist_group_end {
-					state.rep[state.pc] = 0
-				}
-				continue
+				
 
 			}
 
@@ -384,7 +370,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					if save_state == true &&  
 						re.prog[return_pc].ist != regex.ist_prog_end
 					{
-						// println("Save state!")
+						println("Save state!")
 						// we have not this level, create it
 						if states_index >= states_stack.len - 1 { 
 							// println("Create New state!")

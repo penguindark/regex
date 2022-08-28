@@ -780,10 +780,8 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 			re.prog[pc].rep_max = 1
 			re.prog[pc].source_index = i
 			re.prog[pc].group_id = group_id
-			
-			re.prog[pc].group_start_pc = re.groups[group_id].pc_start
-			re.prog[pc].group_end_pc = pc
 
+			re.groups[group_id].pc_start = re.groups[group_id].pc_start
 			re.groups[group_id].pc_end = pc
 			re.groups[group_id].source_ie = i
 
@@ -1007,8 +1005,17 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 
 	// with only one have no sense to store the state
 	if save_state_count > 1 {
-		re.prog[last_save_state_pc].save_state = false
+		// if re.prog[last_save_state_pc].ist != regex.ist_dot_char 
+		//	&& last_save_state_pc < (re.prog_len - 1)
+		if last_save_state_pc == (re.prog_len - 1)
+		{
+			re.prog[last_save_state_pc].save_state = false
+			save_state_count--
+		}
 	}
+
+	re.save_state_count = save_state_count
+
 	
 	//******************************************
 	// DEBUG PRINT REGEX GENERATED CODE

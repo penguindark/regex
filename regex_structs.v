@@ -121,10 +121,9 @@ mut:
 
 	// validator function pointer
 	validator FnValidator
+	
 	// groups variables
 	group_id  int = -1 // id of the group
-	group_start_pc int
-	group_end_pc int
 
 	// debug fields
 	source_index int
@@ -192,4 +191,7 @@ pub mut:
 	debug    int    // enable in order to have the unroll of the code 0 = NO_DEBUG, 1 = LIGHT 2 = VERBOSE
 	log_func FnLog = simple_log // log function, can be customized by the user
 	query    string // query string
+
+	// Save states
+	save_state_count int = 0
 }
