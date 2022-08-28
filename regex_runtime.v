@@ -429,6 +429,15 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					continue
 				}
 			} else {
+				//
+				if rep == 0 && rep_min == 0 && states_index > 0 
+				&& !re.prog[state.pc].greedy
+				{
+					states_index--
+					println("Restore State!  rep == 0")
+					continue
+				}
+
 				// we have enough token, continue anyway
 				if rep >= rep_min && rep <= rep_max {
 					state.pc = re.get_next_token_pc(state.pc)
