@@ -193,5 +193,6 @@ pub mut:
 	query    string // query string
 
 	// Save states
-	save_state_count int = 0
+	save_state_count int
+	states_stack []State = []State{len:1}
 }

@@ -46,9 +46,11 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 	mut ch := rune(0) // examinated char
 	mut char_len := 0 // utf8 examinated char len
 
+	// reset and init the states
 	mut states_index := 0 // actual state index in states stack
-	mut states_stack := []State{len:1}  // states stack
-	states_stack[0].rep = []int{len:re.prog_len, init:0} // create the first state
+	if re.states_stack[0].rep.len == 0 {
+		re.states_stack[0].rep = []int{len:re.prog_len, init:0} // create the first state
+	}
 
 	mut ist := u32(0) // actual instruction
 	mut group_id := 0
@@ -70,7 +72,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 	unsafe{	
 		for {
-			mut state := &states_stack[states_index]
+			mut state := &re.states_stack[states_index]
 			// println("states_index: ${states_index} PC: ${state.pc} i: ${state.i} txt_len:${in_txt_len}")
 
 			// load the instruction
@@ -370,11 +372,11 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					if save_state == true &&  
 						re.prog[return_pc].ist != regex.ist_prog_end
 					{
-						println("Save state!")
+						// println("Save state!")
 						// we have not this level, create it
-						if states_index >= states_stack.len - 1 { 
+						if states_index >= re.states_stack.len - 1 { 
 							// println("Create New state!")
-							states_stack << State {
+							re.states_stack << State {
 								i:state.i,
 								pc:return_pc,
 								match_start:state.match_start,
@@ -388,19 +390,19 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 							// println("Reuse New state!")
 							states_index++
 
-							states_stack[states_index].i = state.i
-							states_stack[states_index].pc = return_pc
-							states_stack[states_index].match_start = state.match_start
-							states_stack[states_index].match_start = state.match_start
+							re.states_stack[states_index].i = state.i
+							re.states_stack[states_index].pc = return_pc
+							re.states_stack[states_index].match_start = state.match_start
+							re.states_stack[states_index].match_start = state.match_start
 						}
 
-						states_stack[states_index].rep = state.rep.clone()
+						re.states_stack[states_index].rep = state.rep.clone()
 
 						// skip OR sequence if any
-						tmp_pc := re.get_next_token_pc(states_stack[states_index].pc)
+						tmp_pc := re.get_next_token_pc(re.states_stack[states_index].pc)
 						
-						states_stack[states_index].pc = tmp_pc
-						states_stack[states_index].rep[tmp_pc] = 0
+						re.states_stack[states_index].pc = tmp_pc
+						re.states_stack[states_index].rep[tmp_pc] = 0
 						// println("New state ready!")
 					}
 					continue
@@ -464,7 +466,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 	//******************************************
 	// Exit check
 	//******************************************
-	state := states_stack[states_index]
+	state := re.states_stack[states_index]
 
 	// normal exit if match 
 	if ist == regex.ist_prog_end {
