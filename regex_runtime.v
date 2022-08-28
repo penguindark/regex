@@ -161,6 +161,20 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				break
 			}
 
+			// group start IST
+			else if ist == regex.ist_group_start {
+				re.groups[group_id].i_tmp_start = state.i
+				// println("regex.ist_group_start g_index:${state.group_index}")	
+			}
+
+			// group end IST
+			else if ist == regex.ist_group_end {
+				re.groups[group_id].i_start = re.groups[group_id].i_tmp_start
+				re.groups[group_id].i_end = state.i
+				re.groups[group_id].i_tmp_start = -1
+				state.rep[state.pc]++ // increase repetitions
+			}
+
 			//******************************************
 			// Out of Text management
 			//******************************************
@@ -216,28 +230,10 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			}			
 
 			
-			// group start IST
-			if ist == regex.ist_group_start {
-				re.groups[group_id].i_tmp_start = state.i
-				// println("regex.ist_group_start g_index:${state.group_index}")	
-			}
 
-			// group end IST
-			else if ist == regex.ist_group_end {
-				if token_match == true {
-					state.rep[state.pc]++
-					re.groups[group_id].i_start = re.groups[group_id].i_tmp_start
-					re.groups[group_id].i_end = state.i
-					re.groups[group_id].i_tmp_start = -1
-				}
-
-				if token_match == false {
-					println("regex.ist_group_end on token_match FALSE")
-				}
-			}
 
 			// char class IST
-			else if ist == regex.ist_char_class_pos || ist == regex.ist_char_class_neg {
+			if ist == regex.ist_char_class_pos || ist == regex.ist_char_class_neg {
 				token_match = false
 				mut cc_neg := false
 				if ist == regex.ist_char_class_neg {
@@ -405,6 +401,11 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 						re.states_stack[states_index].rep[tmp_pc] = 0
 						// println("New state ready!")
 					}
+
+					// if at group end, go back to group start
+					if ist == regex.ist_group_end {
+						state.pc = re.groups[group_id].pc_start
+					}
 					continue
 				}
 				if rep == rep_max {
@@ -479,8 +480,8 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 	// start from the first token before the ist_prog_end and go backward
 	mut tmp_pc := re.prog_len - 1 
 	for tmp_pc >= 0 {
-		rep := state.rep[tmp_pc]
-		// println("ending check: i: ${i} rep: ${rep} rep_min: ${re.prog[i].rep_min}")
+		mut rep := state.rep[tmp_pc]
+
 		if rep == 0 && re.prog[tmp_pc].rep_min == 0 {
 			if re.prog[tmp_pc].ist != regex.ist_group_end {
 				// not a ist_group_end, check previous token
@@ -491,6 +492,11 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			}
 			continue
 		}
+
+		// added
+		rep = state.rep[tmp_pc]
+
+		println("tmp_pc: ${tmp_pc} rep: ${rep}")
 
 		// no match found exit
 		if rep < re.prog[tmp_pc].rep_min {
