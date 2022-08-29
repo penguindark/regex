@@ -1003,7 +1003,8 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	pc = 0
 	mut last_save_state_pc := -1
 	mut save_state_count := 0
-	for pc < re.prog_len {
+	// avoid to save the state for the last token before the end
+	for pc < re.prog_len { // -2
 		// if the next token is a token that doesn't require save state
 		// avoid to save the state
 		if re.prog[pc].rep_max > 1 
@@ -1016,18 +1017,17 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 		pc++
 	}
 
+	//println("Last save: $last_save_state_pc")
+	// let the save state only for end group as last ist
 
-	// with only one have no sense to store the state
-	if save_state_count > 1 {
-		// if re.prog[last_save_state_pc].ist != regex.ist_dot_char 
-		//	&& last_save_state_pc < (re.prog_len - 1)
-		if last_save_state_pc == (re.prog_len - 1)
-		{
+	if save_state_count > 1 
+	&& last_save_state_pc == re.prog_len - 1
+	&& re.prog[last_save_state_pc].ist != regex.ist_group_end
+	{
+			// print("Removed state")
 			re.prog[last_save_state_pc].save_state = false
 			save_state_count--
-		}
 	}
-
 
 	re.save_state_count = save_state_count
 

@@ -18,9 +18,9 @@ struct State {
 mut:
 	i   int
 	pc  int
+	group_owner int
 	match_start int = -1
 	match_end   int = -1
-	group_index int
 	rep []int // counters for quantifier check (repetitions)
 }
 
@@ -73,7 +73,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 	unsafe{	
 		for {
 			mut state := &re.states_stack[states_index]
-			println("states_index: ${states_index} PC: ${state.pc} i: ${state.i} txt_len:${in_txt_len}")
+			// println("states_index: ${states_index} PC: ${state.pc} i: ${state.i} txt_len:${in_txt_len}")
 
 			// load the instruction
 			if state.pc >= 0 && state.pc < re.prog.len {
@@ -132,7 +132,6 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					if re.prog[state.pc].greedy == true {
 						buf2.write_string('?')
 					}
-					//buf2.write_string(' (#$state.group_index)')
 				}
 
 				buf2.write_string('\n')
@@ -146,14 +145,14 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				// println("HERE we end!")
 
 				// NOTE: Investigate if needed in particular cases
-				/*
+/*				
 				// try other ways
 				if states_index > 0 {
 					println("Restore State! End program, try other ways, restore state!")
 					states_index--
 					continue
 				}
-				*/
+*/				
 
 				re.groups[group_id].i_end = state.i
 				re.groups[group_id].i_start = state.match_start
@@ -164,17 +163,23 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			// group start IST
 			else if ist == regex.ist_group_start {
 				re.groups[group_id].i_tmp_start = state.i
-				// println("regex.ist_group_start g_index:${state.group_index}")	
+				// println("regex.ist_group_start g_index:${group_id}")	
 			}
 
 			// group end IST
 			else if ist == regex.ist_group_end {
-				re.groups[group_id].i_start = re.groups[group_id].i_tmp_start
-				re.groups[group_id].i_end = state.i
-				re.groups[group_id].i_tmp_start = -1
+				
+				// check if the group is ok like the end of the program
 				if token_match == true {
+					re.groups[group_id].i_start = re.groups[group_id].i_tmp_start
+					re.groups[group_id].i_end = state.i
+					re.groups[group_id].i_tmp_start = -1
 					state.rep[state.pc]++ // increase repetitions
+					println("Group [$group_id] GOOD END")
+				} else {
+					println("Group [$group_id] BAD END")
 				}
+				goto check_quantifier
 			}
 
 			//******************************************
@@ -303,18 +308,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					state.i += char_len // next char
 				}
 			}
-
-// TO REMOVE AFTER VERIFY!!
-/*
-			// we have other branches to explore, do it!
-			if token_match == false && states_index > 0 {
-				println("Restore State! we have other branches to explore, do it!")
-				states_index--
-				continue
-			}
-*/
-			
-
+check_quantifier:		
 			//******************************************
 			// Check quantifier
 			//******************************************
@@ -340,7 +334,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				// we have a fail in a group but enough repetitions
 				// TODO: check the result like in the exit
 
-				// println("rep: ${rep} token_match: ${token_match}")
+				//println("rep: ${rep} token_match: ${token_match}")
 				// println("re.prog[${state.pc}]: ${re.prog[state.pc]}")
 				
 			}
@@ -348,13 +342,11 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			//
 			// Quantifier for tokens
 			//
-			mut return_pc := state.pc
-			if ist == regex.ist_group_end {
-				return_pc++
-			}
+			
 
 			// println("token_match ${token_match} IST:${ist:x}")
 			if token_match == true {
+
 				// not enough token, continue
 				if rep < rep_min {
 					continue
@@ -362,21 +354,27 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 				// we are satisfied
 				if rep >= rep_min && rep < rep_max {
+					println("Save state start!")
 					// NOTE: use "re.states_stack[states_index].pc" instead of "state.pc"
 					// in this code block because we are going to change the state!!!
 
 					// we need to manage the state
 					// in order to keep track of the next tokens
 					if save_state == true &&  
-						re.prog[return_pc].ist != regex.ist_prog_end
+						re.prog[state.pc].ist != regex.ist_prog_end
 					{
-						println("Save state! return_pc: $return_pc")
+						mut return_pc := state.pc
+						if ist == regex.ist_group_end {
+							return_pc++
+						}
+						println("Save state! return_pc: $return_pc group_id: $group_id")
 						// we have not this level, create it
 						if states_index >= re.states_stack.len - 1 { 
 							// println("Create New state!")
 							re.states_stack << State {
 								i:state.i,
 								pc:return_pc,
+								group_owner: group_id
 								match_start:state.match_start,
 								match_end:state.match_end,
 								rep:[]int{len:re.prog_len, init:0}
@@ -390,6 +388,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 							re.states_stack[states_index].i = state.i
 							re.states_stack[states_index].pc = return_pc
+							re.states_stack[states_index].group_owner = group_id
 							re.states_stack[states_index].match_start = state.match_start
 							re.states_stack[states_index].match_start = state.match_start
 						}
@@ -410,6 +409,11 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 						// println("group end, go back to group start group_id: ${group_id} pc: ${state.pc}")
 						//println(re.groups[group_id])
 					}
+/*
+					println("===== States =====")
+					println(re.states_stack)
+					println("=========================")
+*/
 					continue
 				}
 				if rep == rep_max {
@@ -421,6 +425,9 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					}
 					continue
 				}
+
+				println("WHy we are here?")
+				break
 			} else {
 				//
 
@@ -428,15 +435,31 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 				// we have enough token, continue anyway
 				if rep >= rep_min && rep <= rep_max {
+					// ONLY for DEBUG!!
+					if re.prog[state.pc].ist == regex.ist_group_end {
+						println("Failed regex.ist_group_end group_id:${group_id}")
+						println("new statepc: ${re.get_next_token_pc(state.pc)}")
+
+						mut index := states_index
+						for index > 0 {
+							if re.states_stack[index].group_owner == group_id {
+								println("Found previous state!")
+								states_index = index
+								break
+							}
+							index--
+						}
+/*
+						println("Not Found previous state!")
+						println(re.states_stack)
+						println("=========================")
+*/
+					}
+
 					state.pc = re.get_next_token_pc(state.pc)
 
 					if re.prog[state.pc].ist != regex.ist_group_end {
 						state.rep[state.pc] = 0
-					}
-
-					// ONLY for DEBUG!!
-					if re.prog[state.pc].ist == regex.ist_group_end {
-						println("new statepc: ${state.pc}")
 					}
 
 					token_match = true
@@ -456,12 +479,15 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				if group_id > 0 &&  re.prog[state.pc].ist != regex.ist_group_end {
 					state.pc = re.groups[group_id].pc_end
 					println("Failed match in group: ${group_id} next pc: ${state.pc}")
-					
 					continue
 				}
-				if re.prog[state.pc].ist == regex.ist_group_end {
-					println("OK the GROUP must EXIT HERE!!!")
-					state.pc = re.get_next_token_pc(state.pc)
+				
+				if re.prog[state.pc].ist == regex.ist_group_end &&
+					state.rep[state.pc] >= re.prog[state.pc].rep_min
+				{
+					println("OK the GROUP must EXIT HERE!!! CONTINUE with next token")
+					
+					//state.pc = re.get_next_token_pc(state.pc)
 					continue
 				}
 
@@ -471,6 +497,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					println("Restore State!  states_index:${states_index}")
 					continue
 				}
+
 
 
 				// no alternatives, break
