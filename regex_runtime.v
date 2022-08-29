@@ -424,14 +424,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			} else {
 				//
 
-				println("Match failed: pc:${state.pc} ist:${re.prog[state.pc].ist:04x}")
-				if rep == 0 && rep_min == 0 && states_index > 0 
-				// && !re.prog[state.pc].greedy
-				{
-					states_index--
-					println("Restore State!  rep == 0")
-					continue
-				}
+				println("MATCH FAILED: pc:${state.pc} ist:${re.prog[state.pc].ist:04x}")
 
 				// we have enough token, continue anyway
 				if rep >= rep_min && rep <= rep_max {
@@ -441,20 +434,12 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 						state.rep[state.pc] = 0
 					}
 
+					// ONLY for DEBUG!!
 					if re.prog[state.pc].ist == regex.ist_group_end {
 						println("new statepc: ${state.pc}")
 					}
+
 					token_match = true
-					continue
-				}
-
-				// not a match
-				// print("HERE not a match!")
-
-				// we have to solve precedent situations, get old status
-				if states_index > 0 {
-					states_index--
-					println("Restore State!  states_index:${states_index}")
 					continue
 				}
 
@@ -474,6 +459,19 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					
 					continue
 				}
+				if re.prog[state.pc].ist == regex.ist_group_end {
+					println("OK the GROUP must EXIT HERE!!!")
+					state.pc = re.get_next_token_pc(state.pc)
+					continue
+				}
+
+				// we have to solve precedent situations, get old status
+				if states_index > 0 {
+					states_index--
+					println("Restore State!  states_index:${states_index}")
+					continue
+				}
+
 
 				// no alternatives, break
 				break
