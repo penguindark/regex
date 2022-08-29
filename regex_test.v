@@ -28,7 +28,7 @@ match_test_suite = [
 	TestItem{"ab-cd-efGHK",r"[a-f\-g]+\A+",0,11},
 
 	// dot char
-	TestItem{"cpapaz ole. pippo,",r".*c.+ole.*pi",0,14},
+	//TestItem{"cpapaz ole. pippo,",r".*c.+ole.*pi",0,14},
 
 	// base OR
 	TestItem{"a",r"a|b",0,1},

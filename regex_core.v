@@ -1019,8 +1019,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 
 	//println("Last save: $last_save_state_pc")
 	// let the save state only for end group as last ist
-
-	if save_state_count > 1 
+	if save_state_count > 0 
 	&& last_save_state_pc == re.prog_len - 1
 	&& re.prog[last_save_state_pc].ist != regex.ist_group_end
 	{
