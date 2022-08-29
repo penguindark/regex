@@ -73,7 +73,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 	unsafe{	
 		for {
 			mut state := &re.states_stack[states_index]
-			// println("states_index: ${states_index} PC: ${state.pc} i: ${state.i} txt_len:${in_txt_len}")
+			println("states_index: ${states_index} PC: ${state.pc} i: ${state.i} txt_len:${in_txt_len}")
 
 			// load the instruction
 			if state.pc >= 0 && state.pc < re.prog.len {
@@ -172,7 +172,9 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				re.groups[group_id].i_start = re.groups[group_id].i_tmp_start
 				re.groups[group_id].i_end = state.i
 				re.groups[group_id].i_tmp_start = -1
-				state.rep[state.pc]++ // increase repetitions
+				if token_match == true {
+					state.rep[state.pc]++ // increase repetitions
+				}
 			}
 
 			//******************************************
@@ -229,9 +231,6 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				break
 			}			
 
-			
-
-
 			// char class IST
 			if ist == regex.ist_char_class_pos || ist == regex.ist_char_class_neg {
 				token_match = false
@@ -268,6 +267,7 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					state.match_end = state.i + char_len
 				}
 
+				// TODO: manage the {0,x} situation
 				state.rep[state.pc]++ // increase repetitions
 				state.i += char_len // next char
 			}
@@ -338,12 +338,11 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 			// 
 			if ist == regex.ist_group_end {
 				// we have a fail in a group but enough repetitions
+				// TODO: check the result like in the exit
 
-				println("rep: ${rep} token_match: ${token_match}")
+				// println("rep: ${rep} token_match: ${token_match}")
 				// println("re.prog[${state.pc}]: ${re.prog[state.pc]}")
 				
-				
-
 			}
 
 			//
@@ -362,13 +361,16 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				}
 
 				// we are satisfied
-				if rep >= rep_min && rep < rep_max {			
+				if rep >= rep_min && rep < rep_max {
+					// NOTE: use "re.states_stack[states_index].pc" instead of "state.pc"
+					// in this code block because we are going to change the state!!!
+
 					// we need to manage the state
 					// in order to keep track of the next tokens
 					if save_state == true &&  
 						re.prog[return_pc].ist != regex.ist_prog_end
 					{
-						// println("Save state!")
+						println("Save state! return_pc: $return_pc")
 						// we have not this level, create it
 						if states_index >= re.states_stack.len - 1 { 
 							// println("Create New state!")
@@ -404,7 +406,9 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 					// if at group end, go back to group start
 					if ist == regex.ist_group_end {
-						state.pc = re.groups[group_id].pc_start
+						re.states_stack[states_index].pc = re.groups[group_id].pc_start
+						// println("group end, go back to group start group_id: ${group_id} pc: ${state.pc}")
+						//println(re.groups[group_id])
 					}
 					continue
 				}
@@ -419,8 +423,10 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 				}
 			} else {
 				//
+
+				println("Match failed: pc:${state.pc} ist:${re.prog[state.pc].ist:04x}")
 				if rep == 0 && rep_min == 0 && states_index > 0 
-				&& !re.prog[state.pc].greedy
+				// && !re.prog[state.pc].greedy
 				{
 					states_index--
 					println("Restore State!  rep == 0")
@@ -433,6 +439,10 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 
 					if re.prog[state.pc].ist != regex.ist_group_end {
 						state.rep[state.pc] = 0
+					}
+
+					if re.prog[state.pc].ist == regex.ist_group_end {
+						println("new statepc: ${state.pc}")
 					}
 					token_match = true
 					continue
@@ -454,6 +464,14 @@ pub fn (mut re RE) match_base(in_txt &u8, in_txt_len int) (int, int) {
 					if re.prog[state.pc].ist != regex.ist_group_end {
 						state.rep[state.pc] = 0
 					}
+					continue
+				}
+
+				// we are in a group
+				if group_id > 0 &&  re.prog[state.pc].ist != regex.ist_group_end {
+					state.pc = re.groups[group_id].pc_end
+					println("Failed match in group: ${group_id} next pc: ${state.pc}")
+					
 					continue
 				}
 

@@ -25,7 +25,7 @@ pub fn (re RE) get_code() string {
 	for pc1 <= re.prog.len {
 		tk := re.prog[pc1]
 		
-		res.write_string('PC:${pc1:3d}')
+		res.write_string('PC:${pc1:3d} GRP:${tk.group_id:0d}')
 
 		res.write_string(' ist: ')
 		res.write_string('${tk.ist:8x}'.replace(' ', '0'))
