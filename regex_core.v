@@ -1026,6 +1026,7 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 			// print("Removed state")
 			re.prog[last_save_state_pc].save_state = false
 			save_state_count--
+
 	}
 
 	re.save_state_count = save_state_count
