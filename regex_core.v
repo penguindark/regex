@@ -1007,11 +1007,12 @@ fn (mut re RE) impl_compile(in_txt string) (int, int) {
 	if save_state_count > 1 {
 		// if re.prog[last_save_state_pc].ist != regex.ist_dot_char 
 		//	&& last_save_state_pc < (re.prog_len - 1)
-		if last_save_state_pc == (re.prog_len - 1)
-		{
+		
+		//if last_save_state_pc == (re.prog_len - 1)
+		//{
 			re.prog[last_save_state_pc].save_state = false
 			save_state_count--
-		}
+		//}
 	}
 
 	re.save_state_count = save_state_count
