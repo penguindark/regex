@@ -54,12 +54,13 @@ fn (re REcontext) re2post(in_re_str string) []PostfixToken {
 		ch, ch_len := get_char(in_re_str, c)
 		match u8(ch) {
 			`|` {
+
 				if natom == 0 {
 					return []PostfixToken
 				}
 				natom--
 				for natom > 0 {
-					buf << PostfixToken{ch:`|`, fcode: concatenation }
+					buf << PostfixToken{ch:`.`, fcode: concatenation}
 					natom--
 				}
 				nalt++
@@ -109,6 +110,7 @@ fn (re REcontext) re2post(in_re_str string) []PostfixToken {
 
 			// standard rune
 			else {
+				// println("ch: ${ch:c}")
 				if natom > 1 {
 					natom--
 					buf << PostfixToken{ch:`.`, fcode: concatenation}
@@ -125,8 +127,9 @@ fn (re REcontext) re2post(in_re_str string) []PostfixToken {
 		buf << PostfixToken{ch:`.`, fcode: concatenation}
 		natom--
 	}
+	println("nalt: ${nalt}")
 	for nalt > 0 {
-		buf << PostfixToken{ch:`|`, fcode: concatenation }
+		buf << PostfixToken{ch:`|`, fcode: postfix_or }
 		nalt--
 	}
 
@@ -226,12 +229,19 @@ unsafe {
 			ind_e2 := re.frag_stack[re.frag_stack_index]
 			re.frag_stack_index--
 			ind_e1 := re.frag_stack[re.frag_stack_index]
-			re.patch(ind_e1, ind_e2)
-			re.state_list[ind_e1].out1 = ind_e2
 			
-			re.frag_stack[re.frag_stack_index] = re.state_list[ind_e2].list_index
+			
+			re.nstate++
+			re.state_list	<< MatchState{
+				fcode: re_split,
+				list_index:  re.state_list.len
+				out0: ind_e1,
+				out1: ind_e2
+			}
+			re.frag_stack[re.frag_stack_index] = re.state_list.len - 1
 			re.frag_stack_index++
-			
+
+			println("list OR      => ${re.frag_stack} index: ${re.frag_stack_index}")
 		} else
 
 		if p.fcode == 0 {
